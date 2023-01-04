@@ -11,8 +11,6 @@
 
 - Bug when partial parsing with an empty schema file ([#4850](https://github.com/dbt-labs/dbt-core/issues/4850), [#<no value>](https://github.com/dbt-labs/dbt-core/pull/<no value>))
 
-
-
 ## dbt-core 1.3.1 - November 16, 2022
 ### Features
 - This pulls the profile name from args when constructing a RuntimeConfig in lib.py, enabling the dbt-server to override the value that's in the dbt_project.yml ([#6201](https://github.com/dbt-labs/dbt-core/issues/6201), [#6202](https://github.com/dbt-labs/dbt-core/pull/6202))
@@ -164,6 +162,10 @@
 - [@varun-dc](https://github.com/varun-dc) ([#5627](https://github.com/dbt-labs/dbt-core/pull/5627))
 - [@yoiki](https://github.com/yoiki) ([#5693](https://github.com/dbt-labs/dbt-core/pull/5693))
 - [@chamini2](https://github.com/chamini2) ([#6042](https://github.com/dbt-labs/dbt-core/pull/6042))
+
+## dbt-core 1.2.4-rc1 - January 04, 2023
+
+
 
 ## Previous Releases
 
