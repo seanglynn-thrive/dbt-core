@@ -56,11 +56,11 @@ jobs:
           brew tap miniscruff/changie https://github.com/miniscruff/changie
           brew install changie
 
-      - name: Audit Version and Parse Into Parts
-        id: semver
-        uses: dbt-labs/actions/parse-semver@v1
-        with:
-          version: ${{ github.event.inputs.version_number }}
+      # - name: Audit Version and Parse Into Parts
+      #   id: semver
+      #   uses: dbt-labs/actions/parse-semver@v1
+      #   with:
+      #     version: ${{ github.event.inputs.version_number }}
 
       - name: Set branch value
         id: variables
@@ -73,12 +73,12 @@ jobs:
           git push origin ${{ steps.variables.outputs.BRANCH_NAME }}
           git branch --set-upstream-to=origin/${{ steps.variables.outputs.BRANCH_NAME }} ${{ steps.variables.outputs.BRANCH_NAME }}
 
-      - name: Bump version
-        run: |
-          source env/bin/activate
-          pip install -r dev-requirements.txt
-          env/bin/bumpversion --allow-dirty --new-version ${{ github.event.inputs.version_number }} major
-          git status
+      # - name: Bump version
+      #   run: |
+      #     source env/bin/activate
+      #     pip install -r dev-requirements.txt
+      #     env/bin/bumpversion --allow-dirty --new-version ${{ github.event.inputs.version_number }} major
+      #     git status
 
       - name: Set Core Team Membership for Changie Contributors exclusion
         run: |
@@ -86,6 +86,8 @@ jobs:
           team_list=( $(jq -r '.[].login' output.json) )
           echo $team_list
           echo 'CORE_TEAM=$team_list' >> $GITHUB_ENV
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Run changie
         run: |
