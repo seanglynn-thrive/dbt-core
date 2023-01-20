@@ -96,7 +96,7 @@ jobs:
         run: |
           curl \
           -H "Accept: application/vnd.github+json" \
-          -H "Authorization: Bearer ${{ github.token }}"\
+          -H "Authorization: Bearer ${{ secrets.FISHTOWN_BOT_PAT }}"\
           -H "X-GitHub-Api-Version: 2022-11-28" \
           https://api.github.com/orgs/dbt-labs/teams
 
@@ -105,6 +105,8 @@ jobs:
           gh api \
           -H "Accept: application/vnd.github+json" \
           /orgs/dbt-labs/teams
+        env:
+          GH_TOKEN: ${{ secrets.FISHTOWN_BOT_PAT }}
 
       - name: Set Core Team Membership for Changie Contributors exclusion
         run: |
@@ -113,7 +115,7 @@ jobs:
           echo $team_list
           echo 'CORE_TEAM=$team_list' >> $GITHUB_ENV
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.FISHTOWN_BOT_PAT }}
 
       - name: Set Core Team Membership for Changie Contributors exclusion
         run: |
