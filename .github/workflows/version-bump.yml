@@ -82,7 +82,7 @@ jobs:
 
       - name: Set Core Team Membership for Changie Contributors exclusion
         run: |
-          gh api -H "Accept: application/vnd.github+json" /orgs/dbt-labs/teams/CORE/members >> output.json
+          gh api -H "Accept: application/vnd.github+json" orgs/dbt-labs/teams/CORE/members >> output.json
           team_list=( $(jq -r '.[].login' output.json) )
           echo $team_list
           echo 'CORE_TEAM=$team_list' >> $GITHUB_ENV
