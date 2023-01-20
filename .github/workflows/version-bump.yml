@@ -80,9 +80,15 @@ jobs:
       #     env/bin/bumpversion --allow-dirty --new-version ${{ github.event.inputs.version_number }} major
       #     git status
 
-      - name: Set Core Team Membership for Changie Contributors exclusion
+      - name: Check gh version
         run: |
           gh --version
+
+      - name: Check another command
+        run: |
+          gh api orgs/dbt-labs/teams/CORE/members
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Set Core Team Membership for Changie Contributors exclusion
         run: |
