@@ -89,6 +89,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
+      - name: Set Core Team Membership for Changie Contributors exclusion
+        run: |
+          team_list=( $(jq -r '.[].login' output.json) )
+          echo $team_list
+          echo 'CORE_TEAM=$team_list' >> $GITHUB_ENV
+
       # - name: Run changie
       #   run: |
       #     if [[ ${{ steps.semver.outputs.is-pre-release }} -eq 1 ]]
