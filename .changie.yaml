@@ -14,7 +14,7 @@ changeFormat: |-
     {{- $changeLink := "[#nbr](https://github.com/dbt-labs/dbt-core/issues/nbr)" | replace "nbr" $issueNbr }}
     {{- $IssueList = append $IssueList $changeLink  }}
   {{- end -}}
-  - {{.Body}} ({{ range $index, $element := $IssueList }}{{if $index}}, {{end}}{{$element}}{{end}})
+  - {{.env.CORE_TEAM}} {{.Body}} ({{ range $index, $element := $IssueList }}{{if $index}}, {{end}}{{$element}}{{end}})
 
 kinds:
   - label: Breaking Changes
