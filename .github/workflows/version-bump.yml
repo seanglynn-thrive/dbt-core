@@ -108,11 +108,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.FISHTOWN_CHANGIE_PAT }}
 
-      - name: Set Core Team Membership for Changie Contributors exclusion
+      - name: Write Core Team Membership to file
         run: |
           gh api -H "Accept: application/vnd.github+json" /orgs/dbt-labs/teams/CORE/members >> output.json
         env:
-          GH_TOKEN:${{ secrets.FISHTOWN_CHANGIE_PAT }}
+          GH_TOKEN: ${{ secrets.FISHTOWN_CHANGIE_PAT }}
 
       - name: Set Core Team Membership for Changie Contributors exclusion
         run: |
