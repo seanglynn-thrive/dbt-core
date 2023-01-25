@@ -108,14 +108,22 @@ jobs:
         # env:
         #   GH_TOKEN: ${{ secrets.IT_TEAM_MEMBERSHIP }}
 
-      - name: Write Core Team Membership to file
+      - name: Write Core Team Membership with slash
         run: |
-          gh api -H "Accept: application/vnd.github+json" /orgs/dbt-labs/teams/CORE >> output.json
+          gh api -H "Accept: application/vnd.github+json" /orgs/dbt-labs/teams/CORE/members
+        env:
+          GH_TOKEN: ${{ secrets.IT_TEAM_MEMBERSHIP }}
+
+
+      - name: Write Core Team Membership no slash
+        run: |
+          gh api -H "Accept: application/vnd.github+json" orgs/dbt-labs/teams/CORE/members
         env:
           GH_TOKEN: ${{ secrets.IT_TEAM_MEMBERSHIP }}
 
       - name: Set Core Team Membership for Changie Contributors exclusion
         run: |
+          gh api -H "Accept: application/vnd.github+json" orgs/dbt-labs/teams/CORE/members >> output.json
           team_list=( $(jq -r '.[].login' output.json) )
           echo $team_list
           echo 'CORE_TEAM=$team_list' >> $GITHUB_ENV
