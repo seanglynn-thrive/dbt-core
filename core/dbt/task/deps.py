@@ -1,3 +1,4 @@
+import json
 from typing import Optional
 
 import dbt.utils
@@ -60,6 +61,8 @@ class DepsTask(BaseTask):
             fire_event(DepsNoPackagesFound())
             return
 
+        packages_installed = {}
+
         with downloads_directory():
             final_deps = resolve_packages(packages, self.config)
 
@@ -73,7 +76,12 @@ class DepsTask(BaseTask):
 
                 fire_event(DepsStartPackageInstall(package_name=package_name))
                 package.install(self.config, renderer)
+
+                # add installed package metadata to write to installed_packages.json at the end
+                packages_installed[package_name] = {"source": source_type, "version": version}
+
                 fire_event(DepsInstallInfo(version_name=package.nice_version_name()))
+
                 if isinstance(package, RegistryPinnedPackage):
                     version_latest = package.get_version_latest()
                     if version_latest != version:
@@ -90,6 +98,11 @@ class DepsTask(BaseTask):
             if packages_to_upgrade:
                 fire_event(Formatting(""))
                 fire_event(DepsNotifyUpdatesAvailable(packages=ListOfStrings(packages_to_upgrade)))
+
+        with open(
+            f"{self.config.packages_install_path}/installed_packages.json", "w"
+        ) as json_output:
+            json.dump(packages_installed, json_output, indent=4)
 
     @classmethod
     def from_args(cls, args):
