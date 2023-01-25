@@ -203,7 +203,12 @@ class TestRekeyedDependencyWithSubduplicates(object):
 
     def test_simple_dependency_deps(self, project):
         run_dbt(["deps"])
-        assert len(os.listdir("dbt_packages")) == 2
+
+        dbt_packages = os.listdir("dbt_packages")
+        dbt_packages_without_json = [x for x in dbt_packages if x != "installed_packages.json"]
+
+        assert len(dbt_packages_without_json) == 2
+        assert len(dbt_packages) == 3
 
 
 class DependencyBranchBase(object):
