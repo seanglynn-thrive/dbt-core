@@ -123,12 +123,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.IT_TEAM_MEMBERSHIP }}
 
+      - name: "cat file"
+        run: cat output.json
+
       - name: Set Core Team Membership for Changie Contributors exclusion
         id: set_team_membership
         run: |
           team_list=( $(jq -r '.[].login' output.json) )
           echo $team_list
-          GH_TOKEN: ${{ secrets.IT_TEAM_MEMBERSHIP }}
           echo 'CORE_TEAM=$team_list' >> $GITHUB_ENV
 
       - name: "[DEBUG] print output"
