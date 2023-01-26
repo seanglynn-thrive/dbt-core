@@ -119,7 +119,7 @@ jobs:
       - name: Write Core Team Membership no slash
         continue-on-error: true
         run: |
-          gh api -H "Accept: application/vnd.github+json" orgs/dbt-labs/teams/Core/members
+          gh api -H "Accept: application/vnd.github+json" orgs/dbt-labs/teams/Core/members > output.json
         env:
           GH_TOKEN: ${{ secrets.IT_TEAM_MEMBERSHIP }}
 
