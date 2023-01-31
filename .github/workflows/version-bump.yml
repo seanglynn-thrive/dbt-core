@@ -129,9 +129,9 @@ jobs:
       - name: Set Core Team Membership for Changie Contributors exclusion
         id: set_team_membership
         run: |
-          team_list=$(jq -r '.[].login' output.json)
+          team_list="$(jq -r '.[].login' output.json)"
           echo $team_list
-          echo "CORE_TEAM=${{ toJSON($team_list) }}" >> $GITHUB_OUTPUT
+          echo "CORE_TEAM=$team_list" >> $GITHUB_OUTPUT
 
       - name: "[DEBUG] print output"
         run: |
