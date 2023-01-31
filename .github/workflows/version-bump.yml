@@ -127,7 +127,7 @@ jobs:
         run: cat output.json
 
       - name: Print Core Team Membership for Changie Contributors exclusion
-        id: set_team_membership
+        id: print_team_membership
         run: |
           team_list="$(jq -r '.[].login' output.json)"
           echo $team_list
