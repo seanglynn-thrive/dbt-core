@@ -123,12 +123,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.IT_TEAM_MEMBERSHIP }}
 
-      - name: Random List
+      - name: Random Text
         id: set_some_list
         run: |
-          some_list=[a b c]
-          echo $some_list
-          echo "SOME_TEAM=$some_list" >> $GITHUB_OUTPUT
+          echo "SOME_TEAM=my test separate by sapces" >> $GITHUB_OUTPUT
 
       - name: Print Core Team Membership for Changie Contributors exclusion
         id: print_team_membership
