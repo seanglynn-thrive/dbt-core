@@ -139,6 +139,7 @@ jobs:
         run: |
           team_list=[$(jq -r '.[].login' output.json)]
           echo $team_list
+          team_list=$(echo $team_list | tr '\n' ' ')
           echo "CORE_TEAM=${team_list}" >> $GITHUB_OUTPUT
 
       - name: "[DEBUG] print output"
