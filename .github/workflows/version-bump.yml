@@ -126,10 +126,16 @@ jobs:
       - name: "cat file"
         run: cat output.json
 
-      - name: Set Core Team Membership for Changie Contributors exclusion
+      - name: Print Core Team Membership for Changie Contributors exclusion
         id: set_team_membership
         run: |
           team_list="$(jq -r '.[].login' output.json)"
+          echo $team_list
+
+      - name: Set Core Team Membership for Changie Contributors exclusion
+        id: set_team_membership
+        run: |
+          team_list=[$(jq -r '.[].login' output.json)]
           echo $team_list
           echo "CORE_TEAM=$team_list" >> $GITHUB_OUTPUT
 
