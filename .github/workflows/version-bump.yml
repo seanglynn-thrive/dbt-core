@@ -123,13 +123,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.IT_TEAM_MEMBERSHIP }}
 
-      - name: "cat file"
-        run: cat output.json
+      - name: Random List
+        id: set_some_list
+        run: |
+          some_list=[a b c]
+          echo $some_list
+          echo "SOME_TEAM=$some_list" >> $GITHUB_OUTPUT
 
       - name: Print Core Team Membership for Changie Contributors exclusion
         id: print_team_membership
         run: |
-          team_list="$(jq -r '.[].login' output.json)"
+          team_list=[$(jq -r '.[].login' output.json)]
           echo $team_list
 
       - name: Set Core Team Membership for Changie Contributors exclusion
