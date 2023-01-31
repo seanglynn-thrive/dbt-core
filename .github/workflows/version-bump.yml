@@ -46,75 +46,39 @@ jobs:
           source env/bin/activate
           pip install --upgrade pip
 
-      # - name: Add Homebrew to PATH
-      #   run: |
-      #     echo "/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin" >> $GITHUB_PATH
+      - name: Add Homebrew to PATH
+        run: |
+          echo "/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin" >> $GITHUB_PATH
 
-      # - name: Install Homebrew packages
-      #   run: |
-      #     brew install pre-commit
-      #     brew tap miniscruff/changie https://github.com/miniscruff/changie
-      #     brew install changie
+      - name: Install Homebrew packages
+        run: |
+          brew install pre-commit
+          brew tap miniscruff/changie https://github.com/miniscruff/changie
+          brew install changie
 
-      # - name: Audit Version and Parse Into Parts
-      #   id: semver
-      #   uses: dbt-labs/actions/parse-semver@v1
-      #   with:
-      #     version: ${{ github.event.inputs.version_number }}
+      - name: Audit Version and Parse Into Parts
+        id: semver
+        uses: dbt-labs/actions/parse-semver@v1
+        with:
+          version: ${{ github.event.inputs.version_number }}
 
-      # - name: Set branch value
-      #   id: variables
-      #   run: |
-      #     echo "BRANCH_NAME=prep-release/${{ github.event.inputs.version_number }}_$GITHUB_RUN_ID" >> $GITHUB_OUTPUT
+      - name: Set branch value
+        id: variables
+        run: |
+          echo "BRANCH_NAME=prep-release/${{ github.event.inputs.version_number }}_$GITHUB_RUN_ID" >> $GITHUB_OUTPUT
 
-      # - name: Create PR branch
-      #   run: |
-      #     git checkout -b ${{ steps.variables.outputs.BRANCH_NAME }}
-      #     git push origin ${{ steps.variables.outputs.BRANCH_NAME }}
-      #     git branch --set-upstream-to=origin/${{ steps.variables.outputs.BRANCH_NAME }} ${{ steps.variables.outputs.BRANCH_NAME }}
+      - name: Create PR branch
+        run: |
+          git checkout -b ${{ steps.variables.outputs.BRANCH_NAME }}
+          git push origin ${{ steps.variables.outputs.BRANCH_NAME }}
+          git branch --set-upstream-to=origin/${{ steps.variables.outputs.BRANCH_NAME }} ${{ steps.variables.outputs.BRANCH_NAME }}
 
-      # - name: Bump version
-      #   run: |
-      #     source env/bin/activate
-      #     pip install -r dev-requirements.txt
-      #     env/bin/bumpversion --allow-dirty --new-version ${{ github.event.inputs.version_number }} major
-      #     git status
-
-      # - name: Check gh version
-      #   run: |
-      #     gh --version
-
-      # - name: Check curl emmyoop
-      #   run: |
-      #     curl https://api.github.com/users/emmyoop
-
-      # - name: Check curl dbt-labs repos
-      #   run: |
-      #     curl https://api.github.com/orgs/dbt-labs/repos
-
-      # - name: Check curl dbt-labs teams
-      #   run: |
-      #     curl \
-      #     -H "Accept: application/vnd.github+json" \
-      #     -H "Authorization: Bearer ${{ secrets.IT_TEAM_MEMBERSHIP }}"\
-      #     -H "X-GitHub-Api-Version: 2022-11-28" \
-      #     https://api.github.com/orgs/dbt-labs/teams/Core/members
-
-      # - name: List dbt-labs teams with cli
-        # run: |
-        #   gh api \
-        #   -H "Accept: application/vnd.github+json" \
-        #   /orgs/dbt-labs/teams
-        # env:
-        #   GH_TOKEN: ${{ secrets.IT_TEAM_MEMBERSHIP }}
-
-      # - name: Write Core Team Membership with slash
-      #   continue-on-error: true
-      #   run: |
-      #     gh api -H "Accept: application/vnd.github+json" /orgs/dbt-labs/teams/Core/members
-      #   env:
-      #     GH_TOKEN: ${{ secrets.IT_TEAM_MEMBERSHIP }}
-
+      - name: Bump version
+        run: |
+          source env/bin/activate
+          pip install -r dev-requirements.txt
+          env/bin/bumpversion --allow-dirty --new-version ${{ github.event.inputs.version_number }} major
+          git status
 
       - name: Write Core Team Membership no slash
         continue-on-error: true
@@ -123,70 +87,54 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.IT_TEAM_MEMBERSHIP }}
 
-      - name: Random Text
-        id: set_some_list
-        run: |
-          echo "SOME_TEAM=my test separate by sapces" >> $GITHUB_OUTPUT
-
-      - name: Print Core Team Membership for Changie Contributors exclusion
-        id: print_team_membership
-        run: |
-          team_list=[$(jq -r '.[].login' output.json)]
-          echo $team_list
-
       - name: Set Core Team Membership for Changie Contributors exclusion
         id: set_team_membership
         run: |
           team_list=[$(jq -r '.[].login' output.json)]
           echo $team_list
           team_list_single=$(echo $team_list | tr '\n' ' ')
-          echo "CORE_TEAM=$team_list_single" >> $GITHUB_OUTPUT
+          echo "CHANGIE_CORE_TEAM=$team_list_single" >> $GITHUB_ENV
 
-      - name: "[DEBUG] print output"
+      - name: Run changie
         run: |
-          echo: "Core Team List"
-          echo ${{ steps.set_team_membership.outputs.CORE_TEAM }}
+          if [[ ${{ steps.semver.outputs.is-pre-release }} -eq 1 ]]
+          then
+            changie batch ${{ steps.semver.outputs.base-version }}  --move-dir '${{ steps.semver.outputs.base-version }}' --prerelease '${{ steps.semver.outputs.pre-release }}'
+          else
+            changie batch ${{ steps.semver.outputs.base-version }}  --include '${{ steps.semver.outputs.base-version }}' --remove-prereleases
+          fi
+          changie merge
+          git status
 
-      # - name: Run changie
-      #   run: |
-      #     if [[ ${{ steps.semver.outputs.is-pre-release }} -eq 1 ]]
-      #     then
-      #       changie batch ${{ steps.semver.outputs.base-version }}  --move-dir '${{ steps.semver.outputs.base-version }}' --prerelease '${{ steps.semver.outputs.pre-release }}'
-      #     else
-      #       changie batch ${{ steps.semver.outputs.base-version }}  --include '${{ steps.semver.outputs.base-version }}' --remove-prereleases
-      #     fi
-      #     changie merge
-      #     git status
+      # this step will fail on whitespace errors but also correct them
+      - name: Remove trailing whitespace
+        continue-on-error: true
+        run: |
+          pre-commit run trailing-whitespace --files .bumpversion.cfg CHANGELOG.md .changes/*
+          git status
 
-      # # this step will fail on whitespace errors but also correct them
-      # - name: Remove trailing whitespace
-      #   continue-on-error: true
-      #   run: |
-      #     pre-commit run trailing-whitespace --files .bumpversion.cfg CHANGELOG.md .changes/*
-      #     git status
+      # this step will fail on newline errors but also correct them
+      - name: Removing extra newlines
+        continue-on-error: true
+        run: |
+          pre-commit run end-of-file-fixer --files .bumpversion.cfg CHANGELOG.md .changes/*
+          git status
 
-      # # this step will fail on newline errors but also correct them
-      # - name: Removing extra newlines
-      #   continue-on-error: true
-      #   run: |
-      #     pre-commit run end-of-file-fixer --files .bumpversion.cfg CHANGELOG.md .changes/*
-      #     git status
+      - name: Commit version bump to branch
+        uses: EndBug/add-and-commit@v7
+        with:
+          author_name: 'Github Build Bot'
+          author_email: 'buildbot@fishtownanalytics.com'
+          message: 'Bumping version to ${{ github.event.inputs.version_number }} and generate CHANGELOG'
+          branch: '${{ steps.variables.outputs.BRANCH_NAME }}'
+          push: 'origin origin/${{ steps.variables.outputs.BRANCH_NAME }}'
 
-      # - name: Commit version bump to branch
-      #   uses: EndBug/add-and-commit@v7
-      #   with:
-      #     author_name: 'Github Build Bot'
-      #     author_email: 'buildbot@fishtownanalytics.com'
-      #     message: 'Bumping version to ${{ github.event.inputs.version_number }} and generate CHANGELOG'
-      #     branch: '${{ steps.variables.outputs.BRANCH_NAME }}'
-      #     push: 'origin origin/${{ steps.variables.outputs.BRANCH_NAME }}'
-
-      # - name: Create Pull Request
-      #   uses: peter-evans/create-pull-request@v3
-      #   with:
-      #     author: 'Github Build Bot <buildbot@fishtownanalytics.com>'
-      #     base: ${{github.ref}}
-      #     title: 'Bumping version to ${{ github.event.inputs.version_number }} and generate changelog'
-      #     branch: '${{ steps.variables.outputs.BRANCH_NAME }}'
-      #     labels: |
-      #       Skip Changelog
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v3
+        with:
+          author: 'Github Build Bot <buildbot@fishtownanalytics.com>'
+          base: ${{github.ref}}
+          title: 'Bumping version to ${{ github.event.inputs.version_number }} and generate changelog'
+          branch: '${{ steps.variables.outputs.BRANCH_NAME }}'
+          labels: |
+            Skip Changelog
