@@ -103,7 +103,7 @@ footerFormat: |
     {{- range $author := $authorList }}
       {{- $authorLower := lower $author }}
       {{- /* we only want to include non-core team contributors */}}
-      {{- if not (has $authorLower $core_team)}}
+      {{- if not (has $authorLower $exclude_authors)}}
         {{- $changeList := splitList " " $change.Custom.Author }}
           {{- $IssueList := list }}
           {{- $changeLink := $change.Kind }}
