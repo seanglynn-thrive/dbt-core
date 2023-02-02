@@ -142,6 +142,7 @@ jobs:
       env_setup_script_path: ${{ inputs.env_setup_script_path }}
       test_run: ${{ inputs.test_run }}
       nightly_release: ${{ inputs.nightly_release }}
+      IT_TEAM_MEMBERSHIP: ${{ secrets.IT_TEAM_MEMBERSHIP }}
 
     secrets:
       FISHTOWN_BOT_PAT: ${{ secrets.FISHTOWN_BOT_PAT }}
