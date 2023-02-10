@@ -200,15 +200,40 @@ def debug(ctx, **kwargs):
 
 
 # dbt deps
-@cli.command("deps")
+@cli.group()
+@click.pass_context
+def deps(ctx, **kwargs):
+    """Pull the most recent version of the dependencies listed in packages.yml"""
+
+
+# dbt deps lock
+@deps.command("lock")
 @click.pass_context
 @p.profile
 @p.profiles_dir
 @p.project_dir
 @p.target
 @p.vars
-def deps(ctx, **kwargs):
-    """Pull the most recent version of the dependencies listed in packages.yml"""
+def deps_lock(ctx, **kwargs):
+    """Pull the most recent version of the dependencies listed in packages.yml into package-lock.yml file"""
+    flags = Flags()
+    click.echo(f"`{inspect.stack()[0][3]}` called\n flags: {flags}")
+
+
+# dbt deps add
+@deps.command("add")
+@click.pass_context
+@p.profile
+@p.profiles_dir
+@p.project_dir
+@p.target
+@p.vars
+@p.package
+@p.package_version
+@p.source
+@p.dry_run
+def deps_add(ctx, **kwargs):
+    """Add a new package to the packages.yml file"""
     flags = Flags()
     click.echo(f"`{inspect.stack()[0][3]}` called\n flags: {flags}")
 

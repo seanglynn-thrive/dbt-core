@@ -132,3 +132,15 @@ def resolve_packages(
     resolved = final.resolved()
     _check_for_duplicate_project_names(resolved, config, renderer)
     return resolved
+
+
+def resolve_lock_packages(packages: List[PackageContract]) -> List[PinnedPackage]:
+    lock_packages = PackageListing.from_contracts(packages)
+    final = PackageListing()
+
+    for package in lock_packages:
+        final.incorporate(package)
+
+    resolved = final.resolved()
+
+    return resolved

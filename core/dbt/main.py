@@ -465,6 +465,53 @@ def _build_deps_subparser(subparsers, base_subparser):
     return sub
 
 
+def _build_deps_lock_subparser(subparsers, base_subparser):
+    # it might look like docs_sub is the correct parents entry, but that
+    # will cause weird errors about 'conflicting option strings'.
+    lock_sub = subparsers.add_parser(
+        "lock",
+        parents=[base_subparser],
+        help="""Build lock file based on latest installed packages in packages.yml""",
+    )
+    lock_sub.set_defaults(cls=deps_task.LockTask, which="lock", rpc_method="deps.lock")
+
+    _add_defer_arguments(lock_sub)
+    return lock_sub
+
+
+def _build_deps_add_subparser(subparsers, base_subparser):
+    add_sub = subparsers.add_parser(
+        "add", parents=[base_subparser], help="Add a package to packages.yml"
+    )
+
+    add_sub.add_argument(
+        "--package", help="Name of package to add to packages.yml.", required=True
+    )
+
+    # Can't make version required because local source package install doesn't require version.
+    # A check & event type exists in `dbt deps add`
+    # to ensure a version is passed in when source isn't local.
+    add_sub.add_argument("--version", help="Version of the package to install.")
+
+    add_sub.add_argument(
+        "--source",
+        choices=["hub", "git", "local"],
+        default="hub",
+        help="Source to download page from, must be one of hub, git, or local. Defaults to hub.",
+    )
+
+    add_sub.add_argument(
+        "--dry-run",
+        type=bool,
+        default=False,
+        help="Option to run `dbt deps add` without updating package-lock.yml file.",
+    )
+
+    add_sub.set_defaults(cls=deps_task.AddTask, which="deps", rpc_method="deps.add")
+
+    return add_sub
+
+
 def _build_snapshot_subparser(subparsers, base_subparser):
     sub = subparsers.add_parser(
         "snapshot",
@@ -1165,11 +1212,14 @@ def parse_args(args, cls=DBTArgumentParser):
     docs_subs = docs_sub.add_subparsers(title="Available sub-commands")
     source_sub = _build_source_subparser(subs, base_subparser)
     source_subs = source_sub.add_subparsers(title="Available sub-commands")
+    deps_sub = _build_deps_subparser(subs, base_subparser)
+    deps_subs = deps_sub.add_subparsers(title="Available sub-commands")
+    _build_deps_lock_subparser(deps_subs, base_subparser)
+    _build_deps_add_subparser(deps_subs, base_subparser)
 
     _build_init_subparser(subs, base_subparser)
     _build_clean_subparser(subs, base_subparser)
     _build_debug_subparser(subs, base_subparser)
-    _build_deps_subparser(subs, base_subparser)
     _build_list_subparser(subs, base_subparser)
 
     build_sub = _build_build_subparser(subs, base_subparser)

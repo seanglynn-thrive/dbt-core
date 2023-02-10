@@ -1457,6 +1457,51 @@ class NoNodesForSelectionCriteria(WarnLevel, pt.NoNodesForSelectionCriteria):
         return f"The selection criterion '{self.spec_raw}' does not match any nodes"
 
 
+@dataclass
+class DepsLockCreated(InfoLevel, pt.DepsLockCreated):
+    def code(self):
+        return "M031"
+
+    def message(self) -> str:
+        return f"Created lock file in file path: {self.lock_filepath}"
+
+
+@dataclass
+class DepsLockUpdating(InfoLevel, pt.DepsLockUpdating):
+    def code(self):
+        return "M032"
+
+    def message(self) -> str:
+        return f"Updating lock file in file path: {self.lock_filepath}"
+
+
+@dataclass
+class DepsAddPackage(InfoLevel, pt.DepsAddPackage):
+    def code(self):
+        return "M033"
+
+    def message(self) -> str:
+        return f"Added new package {self.package_name}@{self.version} to {self.packages_filepath}"
+
+
+@dataclass
+class DepsFoundDuplicatePackage(InfoLevel, pt.DepsFoundDuplicatePackage):
+    def code(self):
+        return "M034"
+
+    def message(self) -> str:
+        return f"Found duplicate package in packages.yml, removing: {self.removed_package}"
+
+
+@dataclass
+class DepsVersionMissing(InfoLevel, pt.DepsVersionMissing):
+    def code(self):
+        return "M035"
+
+    def message(self) -> str:
+        return f"Version is required to add a package when source is {self.source}"
+
+
 # =======================================================
 # Q - Node execution
 # =======================================================

@@ -1808,6 +1808,73 @@ class NoNodesForSelectionCriteriaMsg(betterproto.Message):
 
 
 @dataclass
+class DepsLockCreated(betterproto.Message):
+    """M031"""
+
+    lock_filepath: str = betterproto.string_field(1)
+
+
+@dataclass
+class DepsLockCreatedMsg(betterproto.Message):
+    info: "EventInfo" = betterproto.message_field(1)
+    data: "DepsLockCreated" = betterproto.message_field(2)
+
+
+@dataclass
+class DepsLockUpdating(betterproto.Message):
+    """M032"""
+
+    lock_filepath: str = betterproto.string_field(1)
+
+
+@dataclass
+class DepsLockUpdatingMsg(betterproto.Message):
+    info: "EventInfo" = betterproto.message_field(1)
+    data: "DepsLockUpdating" = betterproto.message_field(2)
+
+
+@dataclass
+class DepsAddPackage(betterproto.Message):
+    """M033"""
+
+    package_name: str = betterproto.string_field(1)
+    version: str = betterproto.string_field(2)
+    packages_filepath: str = betterproto.string_field(3)
+
+
+@dataclass
+class DepsAddPackageMsg(betterproto.Message):
+    info: "EventInfo" = betterproto.message_field(1)
+    data: "DepsAddPackage" = betterproto.message_field(2)
+
+
+@dataclass
+class DepsFoundDuplicatePackage(betterproto.Message):
+    """M034"""
+
+    removed_package: dict = betterproto.string_field(1)
+
+
+@dataclass
+class DepsFoundDuplicatePackageMsg(betterproto.Message):
+    info: "EventInfo" = betterproto.message_field(1)
+    data: "DepsFoundDuplicatePackage" = betterproto.message_field(2)
+
+
+@dataclass
+class DepsVersionMissing(betterproto.Message):
+    """M035"""
+
+    source: str = betterproto.string_field(1)
+
+
+@dataclass
+class DepsVersionMissingMsg(betterproto.Message):
+    info: "EventInfo" = betterproto.message_field(1)
+    data: "DepsVersionMissing" = betterproto.message_field(2)
+
+
+@dataclass
 class RunningOperationCaughtError(betterproto.Message):
     """Q001"""
 

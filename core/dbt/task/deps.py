@@ -1,5 +1,5 @@
-import json
 from typing import Optional
+import yaml
 
 import dbt.utils
 import dbt.deprecations
@@ -7,20 +7,26 @@ import dbt.exceptions
 
 from dbt.config import UnsetProfileConfig
 from dbt.config.renderer import DbtProjectYamlRenderer
+from dbt.config.project import package_config_from_data, package_data_from_root
 from dbt.deps.base import downloads_directory
-from dbt.deps.resolver import resolve_packages
+from dbt.deps.resolver import resolve_lock_packages, resolve_packages
 from dbt.deps.registry import RegistryPinnedPackage
 
 from dbt.events.proto_types import ListOfStrings
 from dbt.events.functions import fire_event
 from dbt.events.types import (
+    DepsAddPackage,
+    DepsFoundDuplicatePackage,
+    DepsInstallInfo,
+    DepsListSubdirectory,
+    DepsLockCreated,
+    DepsLockUpdating,
     DepsNoPackagesFound,
+    DepsNotifyUpdatesAvailable,
     DepsStartPackageInstall,
     DepsUpdateAvailable,
     DepsUpToDate,
-    DepsInstallInfo,
-    DepsListSubdirectory,
-    DepsNotifyUpdatesAvailable,
+    DepsVersionMissing,
     Formatting,
 )
 from dbt.clients import system
@@ -28,11 +34,45 @@ from dbt.clients import system
 from dbt.task.base import BaseTask, move_to_nearest_project_dir
 
 
+def _create_packages_yml_entry(package, version, source):
+    """Create a formatted entry to add to `packages.yml` or `package-lock.yml` file
+
+    Args:
+        package (str): Name of package to download
+        version (str): Version of package to download
+        source (str): Source of where to download package from
+
+    Returns:
+        dict: Formatted dict to write to `packages.yml` or `package-lock.yml` file
+    """
+    package_key = source
+    version_key = "version"
+
+    if source == "hub":
+        package_key = "package"
+
+    if source == "git":
+        version_key = "revision"
+
+    packages_yml_entry = {package_key: package}
+
+    if version:
+        if "," in version:
+            version = version.split(",")
+
+        packages_yml_entry[version_key] = version
+
+    return packages_yml_entry
+
+
 class DepsTask(BaseTask):
     ConfigType = UnsetProfileConfig
 
     def __init__(self, args, config: UnsetProfileConfig):
         super().__init__(args=args, config=config)
+
+        if not system.path_exists(f"{self.config.project_root}/package-lock.yml"):
+            LockTask(args, config).run()
 
     def track_package_install(
         self, package_name: str, source_type: str, version: Optional[str]
@@ -55,21 +95,25 @@ class DepsTask(BaseTask):
         )
 
     def run(self) -> None:
+        if system.path_exists(self.config.packages_install_path):
+            system.rmtree(self.config.packages_install_path)
+
         system.make_directory(self.config.packages_install_path)
-        packages = self.config.packages.packages
-        if not packages:
+
+        packages_lock_dict = package_data_from_root(self.config.project_root, "package-lock.yml")
+        packages_lock_config = package_config_from_data(packages_lock_dict).packages
+
+        if not packages_lock_config:
             fire_event(DepsNoPackagesFound())
             return
 
-        packages_installed = {}
-
         with downloads_directory():
-            final_deps = resolve_packages(packages, self.config)
-
+            lock_defined_deps = resolve_lock_packages(packages_lock_config)
             renderer = DbtProjectYamlRenderer(self.config, self.config.cli_vars)
 
             packages_to_upgrade = []
-            for package in final_deps:
+
+            for package in lock_defined_deps:
                 package_name = package.name
                 source_type = package.source_type()
                 version = package.get_version()
@@ -77,32 +121,27 @@ class DepsTask(BaseTask):
                 fire_event(DepsStartPackageInstall(package_name=package_name))
                 package.install(self.config, renderer)
 
-                # add installed package metadata to write to installed_packages.json at the end
-                packages_installed[package_name] = {"source": source_type, "version": version}
-
                 fire_event(DepsInstallInfo(version_name=package.nice_version_name()))
 
                 if isinstance(package, RegistryPinnedPackage):
                     version_latest = package.get_version_latest()
+
                     if version_latest != version:
                         packages_to_upgrade.append(package_name)
                         fire_event(DepsUpdateAvailable(version_latest=version_latest))
                     else:
                         fire_event(DepsUpToDate())
+
                 if package.get_subdirectory():
                     fire_event(DepsListSubdirectory(subdirectory=package.get_subdirectory()))
 
                 self.track_package_install(
                     package_name=package_name, source_type=source_type, version=version
                 )
+
             if packages_to_upgrade:
                 fire_event(Formatting(""))
                 fire_event(DepsNotifyUpdatesAvailable(packages=ListOfStrings(packages_to_upgrade)))
-
-        with open(
-            f"{self.config.packages_install_path}/installed_packages.json", "w"
-        ) as json_output:
-            json.dump(packages_installed, json_output, indent=4)
 
     @classmethod
     def from_args(cls, args):
@@ -110,3 +149,102 @@ class DepsTask(BaseTask):
         # into the modules directory
         move_to_nearest_project_dir(args)
         return super().from_args(args)
+
+
+class LockTask(BaseTask):
+    ConfigType = UnsetProfileConfig
+
+    def __init__(self, args, config: UnsetProfileConfig):
+        super().__init__(args=args, config=config)
+
+    def run(self):
+        lock_filepath = f"{self.config.project_root}/package-lock.yml"
+
+        packages = self.config.packages.packages
+        packages_installed = {"packages": []}
+
+        if not packages:
+            fire_event(DepsNoPackagesFound())
+            return
+
+        with downloads_directory():
+            resolved_deps = resolve_packages(packages, self.config)
+
+        # this loop is to create the package-lock.yml in the same format as original packages.yml
+        # package-lock.yml includes both the stated packages in packages.yml along with dependent packages
+        for package in resolved_deps:
+            lock_entry = _create_packages_yml_entry(
+                package.name, package.get_version(), package.source_type()
+            )
+            packages_installed["packages"].append(lock_entry)
+
+        with open(lock_filepath, "w") as lock_obj:
+            yaml.safe_dump(packages_installed, lock_obj)
+
+        fire_event(DepsLockCreated(lock_filepath=lock_filepath))
+
+
+class AddTask(BaseTask):
+    ConfigType = UnsetProfileConfig
+
+    def __init__(self, args, config: UnsetProfileConfig):
+        super().__init__(args=args, config=config)
+
+    def check_for_duplicate_packages(self, packages_yml):
+        """Loop through contents of `packages.yml` to ensure no duplicate package names + versions.
+
+        This duplicate check will take into consideration exact match of a package name, as well as
+        a check to see if a package name exists within a name (i.e. a package name inside a git URL).
+
+        Args:
+            packages_yml (dict): In-memory read of `packages.yml` contents
+
+        Returns:
+            dict: Updated or untouched packages_yml contents
+        """
+        for i, pkg_entry in enumerate(packages_yml["packages"]):
+            for val in pkg_entry.values():
+                if self.args.package in val:
+                    del packages_yml["packages"][i]
+
+                    fire_event(DepsFoundDuplicatePackage(removed_package=pkg_entry))
+
+        return packages_yml
+
+    def run(self):
+        packages_yml_filepath = f"{self.config.project_root}/packages.yml"
+
+        if not system.path_exists(packages_yml_filepath):
+            fire_event(DepsNoPackagesFound())
+            return
+
+        if not self.args.version and self.args.source != "local":
+            fire_event(DepsVersionMissing(source=self.args.source))
+            return
+
+        new_package_entry = _create_packages_yml_entry(
+            self.args.package, self.args.version, self.args.source
+        )
+
+        with open(packages_yml_filepath, "r") as user_yml_obj:
+            packages_yml = yaml.safe_load(user_yml_obj)
+            packages_yml = self.check_for_duplicate_packages(packages_yml)
+            packages_yml["packages"].append(new_package_entry)
+
+        if packages_yml:
+            with open(packages_yml_filepath, "w") as pkg_obj:
+                yaml.safe_dump(packages_yml, pkg_obj)
+
+                fire_event(
+                    DepsAddPackage(
+                        package_name=self.args.package,
+                        version=self.args.version,
+                        packages_filepath=packages_yml_filepath,
+                    )
+                )
+
+        if not self.args.dry_run:
+            fire_event(
+                DepsLockUpdating(lock_filepath=f"{self.config.project_root}/package-lock.yml")
+            )
+            LockTask(self.args, self.config).run()

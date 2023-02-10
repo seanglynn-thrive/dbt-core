@@ -93,13 +93,14 @@ def _load_yaml(path):
     return load_yaml_text(contents)
 
 
-def package_data_from_root(project_root):
-    package_filepath = resolve_path_from_base("packages.yml", project_root)
+def package_data_from_root(project_root, package_file_name="packages.yml"):
+    package_filepath = resolve_path_from_base(package_file_name, project_root)
 
     if path_exists(package_filepath):
         packages_dict = _load_yaml(package_filepath)
     else:
         packages_dict = None
+
     return packages_dict
 
 
@@ -490,6 +491,7 @@ class PartialProject(RenderComponents):
         project_root = os.path.normpath(project_root)
         project_dict = _raw_project_from(project_root)
         config_version = project_dict.get("config-version", 1)
+
         if config_version != 2:
             raise DbtProjectError(
                 f"Invalid config version: {config_version}, expected 2",
@@ -498,6 +500,7 @@ class PartialProject(RenderComponents):
 
         packages_dict = package_data_from_root(project_root)
         selectors_dict = selector_data_from_root(project_root)
+
         return cls.from_dicts(
             project_root=project_root,
             project_dict=project_dict,

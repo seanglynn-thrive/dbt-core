@@ -74,6 +74,14 @@ defer = click.option(
     help="If set, defer to the state variable for resolving unselected nodes.",
 )
 
+dry_run = click.option(
+    "--dry-run",
+    envvar=None,
+    help="Option to run `dbt deps add` without updating package-lock.yml file.",
+    default=False,
+    type=click.BOOL,
+)
+
 enable_legacy_logger = click.option(
     "--enable-legacy-logger/--no-enable-legacy-logger",
     envvar="DBT_ENABLE_LEGACY_LOGGER",
@@ -160,6 +168,12 @@ output_path = click.option(
     help="Specify the output path for the json report. By default, outputs to 'target/sources.json'",
     type=click.Path(file_okay=True, dir_okay=False, writable=True),
     default=PurePath.joinpath(Path.cwd(), "target/sources.json"),
+)
+
+package = click.option("--package", envvar=None, help="Name of package to add to packages.yml.")
+
+package_version = click.option(
+    "--version/--package_version", envvar=None, help="Version of the package to install."
 )
 
 parse_only = click.option(
@@ -271,6 +285,14 @@ show = click.option(
 
 skip_profile_setup = click.option(
     "--skip-profile-setup", "-s", envvar=None, help="Skip interactive profile setup.", is_flag=True
+)
+
+source = click.option(
+    "--source",
+    envvar=None,
+    help="Source to download page from, must be one of hub, git, or local. Defaults to hub.",
+    type=click.Choice(["hub", "git", "local"], case_sensitive=True),
+    default="hub",
 )
 
 # TODO:  The env var and name (reflected in flags) are corrections!
