@@ -53,7 +53,7 @@ class BaseExcept(BaseUtils):
         }
 
     def test_build_assert_equal(self, project):
-        run_dbt(["deps"])
+        run_dbt(["deps", "install"])
         run_dbt(["build"])
 
         check_relations_equal(
