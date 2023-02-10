@@ -8,7 +8,7 @@ from dbt.config.profile import Profile
 from dbt.contracts.graph.manifest import Manifest
 from dbt.task.clean import CleanTask
 from dbt.task.compile import CompileTask
-from dbt.task.deps import AddTask, LockTask, DepsTask
+from dbt.task.deps import AddTask, DepsTask, LockTask
 from dbt.task.debug import DebugTask
 from dbt.task.run import RunTask
 from dbt.task.serve import ServeTask
@@ -289,8 +289,13 @@ def debug(ctx, **kwargs):
 
 
 # dbt deps
-@cli.group()
+@cli.group(invoke_without_command=True)
 @click.pass_context
+@p.profile
+@p.profiles_dir
+@p.project_dir
+@p.target
+@p.vars
 @requires.preflight
 @requires.unset_profile
 @requires.project
@@ -305,11 +310,6 @@ def deps(ctx, **kwargs):
 # dbt deps lock
 @deps.command("lock")
 @click.pass_context
-@p.profile
-@p.profiles_dir
-@p.project_dir
-@p.target
-@p.vars
 def deps_lock(ctx, **kwargs):
     """Pull the most recent version of the dependencies listed in packages.yml into package-lock.yml file"""
     task = LockTask(ctx.obj["flags"], ctx.obj["project"])
@@ -317,18 +317,10 @@ def deps_lock(ctx, **kwargs):
     success = task.interpret_results(results)
     return results, success
 
-    # flags = Flags()
-    # click.echo(f"`{inspect.stack()[0][3]}` called\n flags: {flags}")
-
 
 # dbt deps add
 @deps.command("add")
 @click.pass_context
-@p.profile
-@p.profiles_dir
-@p.project_dir
-@p.target
-@p.vars
 @p.package
 @p.package_version
 @p.source
@@ -339,9 +331,6 @@ def deps_add(ctx, **kwargs):
     results = task.run()
     success = task.interpret_results(results)
     return results, success
-
-    # flags = Flags()
-    # click.echo(f"`{inspect.stack()[0][3]}` called\n flags: {flags}")
 
 
 # dbt init
