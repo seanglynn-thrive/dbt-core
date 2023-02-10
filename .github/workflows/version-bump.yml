@@ -25,4 +25,5 @@ jobs:
     uses: dbt-labs/actions/.github/workflows/version-bump.yml@er/ct-890-pass-in-changie-team-membership
     with:
       version_number: ${{ inputs.version_number }}
-    secrets: inherit  # ok since what we are calling is internally maintained
+    secrets:
+      IT_TEAM_MEMBERSHIP: ${{ secrets.IT_TEAM_MEMBERSHIP }}
