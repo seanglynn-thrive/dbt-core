@@ -154,7 +154,7 @@ class LockTask(BaseTask):
     def run(self):
         lock_filepath = f"{self.project.project_root}/package-lock.yml"
 
-        packages = self.packages.packages.packages
+        packages = self.project.packages.packages
         packages_installed = {"packages": []}
 
         if not packages:

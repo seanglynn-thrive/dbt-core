@@ -289,7 +289,13 @@ def debug(ctx, **kwargs):
 
 
 # dbt deps
-@cli.group(invoke_without_command=True)
+@cli.group()
+@click.pass_context
+def deps(ctx, **kwargs):
+    """Pull the most recent version of the dependencies listed in packages.yml"""
+
+
+@deps.command("install")
 @click.pass_context
 @p.profile
 @p.profiles_dir
@@ -299,8 +305,8 @@ def debug(ctx, **kwargs):
 @requires.preflight
 @requires.unset_profile
 @requires.project
-def deps(ctx, **kwargs):
-    """Pull the most recent version of the dependencies listed in packages.yml"""
+def deps_install(ctx, **kwargs):
+    """Install the most recent version of the dependencies listed in packages.yml"""
     task = DepsTask(ctx.obj["flags"], ctx.obj["project"])
     results = task.run()
     success = task.interpret_results(results)
@@ -310,6 +316,14 @@ def deps(ctx, **kwargs):
 # dbt deps lock
 @deps.command("lock")
 @click.pass_context
+@p.profile
+@p.profiles_dir
+@p.project_dir
+@p.target
+@p.vars
+@requires.preflight
+@requires.unset_profile
+@requires.project
 def deps_lock(ctx, **kwargs):
     """Pull the most recent version of the dependencies listed in packages.yml into package-lock.yml file"""
     task = LockTask(ctx.obj["flags"], ctx.obj["project"])
@@ -321,10 +335,18 @@ def deps_lock(ctx, **kwargs):
 # dbt deps add
 @deps.command("add")
 @click.pass_context
+@p.profile
+@p.profiles_dir
+@p.project_dir
+@p.target
+@p.vars
 @p.package
 @p.package_version
 @p.source
 @p.dry_run
+@requires.preflight
+@requires.unset_profile
+@requires.project
 def deps_add(ctx, **kwargs):
     """Add a new package to the packages.yml file"""
     task = AddTask(ctx.obj["flags"], ctx.obj["project"])

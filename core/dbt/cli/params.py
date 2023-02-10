@@ -168,10 +168,12 @@ output_path = click.option(
     default=PurePath.joinpath(Path.cwd(), "target/sources.json"),
 )
 
-package = click.option("--package", envvar=None, help="Name of package to add to packages.yml.")
+package = click.option(
+    "--package", envvar=None, help="Name of package to add to packages.yml.", type=click.STRING
+)
 
 package_version = click.option(
-    "--version/--package_version", envvar=None, help="Version of the package to install."
+    "--version", envvar=None, help="Version of the package to install.", type=click.STRING
 )
 
 parse_only = click.option(
