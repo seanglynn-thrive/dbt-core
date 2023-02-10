@@ -349,6 +349,53 @@ message InternalDeprecationMsg {
     InternalDeprecation data = 2;
 }
 
+// D - Deprecation
+
+// D001
+message PackageRedirectDeprecation {
+    EventInfo info = 1;
+    string old_name = 2;
+    string new_name = 3;
+}
+
+// D002
+message PackageInstallPathDeprecation {
+    EventInfo info = 1;
+}
+
+// D003
+message ConfigSourcePathDeprecation {
+    EventInfo info = 1;
+    string deprecated_path = 2;
+    string exp_path = 3;
+}
+
+// D004
+message ConfigDataPathDeprecation {
+    EventInfo info = 1;
+    string deprecated_path = 2;
+    string exp_path = 3;
+}
+
+//D005
+message AdapterDeprecationWarning {
+    EventInfo info = 1;
+    string old_name = 2;
+    string new_name = 3;
+}
+
+//D006
+message MetricAttributesRenamed {
+    EventInfo info = 1;
+    string metric_name = 2;
+}
+
+//D007
+message ExposureNameDeprecation {
+    EventInfo info = 1;
+    string exposure = 2;
+}
+
 // E - DB Adapter
 
 // E001
@@ -839,7 +886,21 @@ message UnableToPartialParseMsg {
     UnableToPartialParse data = 2;
 }
 
-// Skipped I025, I026, I027
+// I025
+message StateCheckVarsHash {
+    string checksum = 1;
+    string vars = 2;
+    string profile = 3;
+    string target = 4;
+    string version = 5;
+}
+
+message StateCheckVarsHashMsg {
+    EventInfo info = 1;
+    StateCheckVarsHash data = 2;
+}
+
+// Skipped I026, I027
 
 
 // I028
@@ -863,98 +924,7 @@ message ParsedFileLoadFailedMsg {
     ParsedFileLoadFailed data = 2;
 }
 
-// Skipping I030
-
-
-// I031
-message StaticParserCausedJinjaRendering {
-    string path = 1;
-}
-
-message StaticParserCausedJinjaRenderingMsg {
-    EventInfo info = 1;
-    StaticParserCausedJinjaRendering data = 2;
-}
-
-// I032
-message UsingExperimentalParser {
-    string path = 1;
-}
-
-message UsingExperimentalParserMsg {
-    EventInfo info = 1;
-    UsingExperimentalParser data = 2;
-}
-
-// I033
-message SampleFullJinjaRendering {
-    string path = 1;
-}
-
-message SampleFullJinjaRenderingMsg {
-    EventInfo info = 1;
-    SampleFullJinjaRendering data = 2;
-}
-
-// I034
-message StaticParserFallbackJinjaRendering {
-    string path = 1;
-}
-
-message StaticParserFallbackJinjaRenderingMsg {
-    EventInfo info = 1;
-    StaticParserFallbackJinjaRendering data = 2;
-}
-
-// I035
-message StaticParsingMacroOverrideDetected {
-    string path = 1;
-}
-
-message StaticParsingMacroOverrideDetectedMsg {
-    EventInfo info = 1;
-    StaticParsingMacroOverrideDetected data = 2;
-}
-
-// I036
-message StaticParserSuccess {
-    string path = 1;
-}
-
-message StaticParserSuccessMsg {
-    EventInfo info = 1;
-    StaticParserSuccess data = 2;
-}
-
-// I037
-message StaticParserFailure {
-    string path = 1;
-}
-
-message StaticParserFailureMsg {
-    EventInfo info = 1;
-    StaticParserFailure data = 2;
-}
-
-// I038
-message ExperimentalParserSuccess {
-    string path = 1;
-}
-
-message ExperimentalParserSuccessMsg {
-    EventInfo info = 1;
-    ExperimentalParserSuccess data = 2;
-}
-
-// I039
-message ExperimentalParserFailure {
-    string path = 1;
-}
-
-message ExperimentalParserFailureMsg {
-    EventInfo info = 1;
-    ExperimentalParserFailure data = 2;
-}
+// Skipping I030 - I039
 
 // I040
 message PartialParsingEnabled {
@@ -1124,6 +1094,28 @@ message JinjaLogWarningMsg {
     JinjaLogWarning data = 2;
 }
 
+// I062
+message JinjaLogInfo {
+    NodeInfo node_info = 1;
+    string msg = 2;
+}
+
+message  JinjaLogInfoMsg {
+    EventInfo info = 1;
+     JinjaLogInfo data = 2;
+}
+
+// I063
+message JinjaLogDebug {
+    NodeInfo node_info = 1;
+    string msg = 2;
+}
+
+message JinjaLogDebugMsg {
+    EventInfo info = 1;
+    JinjaLogDebug data = 2;
+}
+
 // M - Deps generation
 
 // M001
@@ -1230,27 +1222,7 @@ message SelectorReportInvalidSelectorMsg {
     SelectorReportInvalidSelector data = 2;
 }
 
-// M011
-message JinjaLogInfo {
-    NodeInfo node_info = 1;
-    string msg = 2;
-}
-
-message  JinjaLogInfoMsg {
-    EventInfo info = 1;
-     JinjaLogInfo data = 2;
-}
-
-// M012
-message JinjaLogDebug {
-    NodeInfo node_info = 1;
-    string msg = 2;
-}
-
-message JinjaLogDebugMsg {
-    EventInfo info = 1;
-    JinjaLogDebug data = 2;
-}
+// Skipped M011 and M012
 
 // M013
 message DepsNoPackagesFound {
@@ -1433,6 +1405,19 @@ message NoNodesForSelectionCriteriaMsg {
     NoNodesForSelectionCriteria data = 2;
 }
 
+// M029
+message DepsUnpinned {
+    EventInfo info = 1;
+    string revision = 2;
+    string git = 3;
+}
+
+// M030
+message NoNodesForSelectionCriteria {
+    EventInfo info = 1;
+    string spec_raw = 2;
+}
+
 // Q - Node execution
 
 // Q001
@@ -1560,9 +1545,16 @@ message LogSeedResult {
     int32 index = 4;
     int32 total = 5;
     float execution_time = 6;
-    string schema = 7;
-    string relation = 8;
+    string source_name = 7;
+    string table_name = 8;
 }
+
+message LogSeedResultMsg {
+    EventInfo info = 1;
+    LogSeedResult data = 2;
+}
+
+// Skipped Q017
 
 message LogSeedResultMsg {
     EventInfo info = 1;
@@ -1734,6 +1726,24 @@ message NothingToDo {
 }
 
 message NothingToDoMsg {
+    NodeInfo node_info = 1;
+    string resource_type = 2;
+    string schema = 3;
+    string node_name = 4;
+    int32 index = 5;
+    int32 total = 6;
+}
+
+message SkippingDetailsMsg {
+    NodeInfo node_info = 1;
+    string resource_type = 2;
+    string schema = 3;
+    string node_name = 4;
+    int32 index = 5;
+    int32 total = 6;
+}
+
+message SkippingDetailsMsg {
     EventInfo info = 1;
     NothingToDo data = 2;
 }
@@ -1768,6 +1778,11 @@ message NoNodesSelected {
 message NoNodesSelectedMsg {
     EventInfo info = 1;
     NoNodesSelected data = 2;
+}
+
+// Q038
+message NoNodesSelected {
+    EventInfo info = 1;
 }
 
 // W - Node testing

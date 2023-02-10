@@ -1,11 +1,10 @@
-from typing import Optional
+from typing import Any, Optional
 import yaml
 
 import dbt.utils
 import dbt.deprecations
 import dbt.exceptions
 
-from dbt.config import UnsetProfileConfig
 from dbt.config.renderer import DbtProjectYamlRenderer
 from dbt.config.project import package_config_from_data, package_data_from_root
 from dbt.deps.base import downloads_directory
@@ -32,6 +31,8 @@ from dbt.events.types import (
 from dbt.clients import system
 
 from dbt.task.base import BaseTask, move_to_nearest_project_dir
+
+from dbt.config import Project
 
 
 def _create_packages_yml_entry(package, version, source):
@@ -66,13 +67,13 @@ def _create_packages_yml_entry(package, version, source):
 
 
 class DepsTask(BaseTask):
-    ConfigType = UnsetProfileConfig
+    def __init__(self, args: Any, project: Project):
+        move_to_nearest_project_dir(project.project_root)
+        super().__init__(args=args, config=None, project=project)
+        self.cli_vars = args.vars
 
-    def __init__(self, args, config: UnsetProfileConfig):
-        super().__init__(args=args, config=config)
-
-        if not system.path_exists(f"{self.config.project_root}/package-lock.yml"):
-            LockTask(args, config).run()
+        if not system.path_exists(f"{self.project.project_root}/package-lock.yml"):
+            LockTask(args, project).run()
 
     def track_package_install(
         self, package_name: str, source_type: str, version: Optional[str]
@@ -89,18 +90,18 @@ class DepsTask(BaseTask):
             version = dbt.utils.md5(version)
 
         dbt.tracking.track_package_install(
-            self.config,
-            self.config.args,
+            "deps",
+            self.project.hashed_name(),
             {"name": package_name, "source": source_type, "version": version},
         )
 
     def run(self) -> None:
-        if system.path_exists(self.config.packages_install_path):
-            system.rmtree(self.config.packages_install_path)
+        if system.path_exists(self.project.packages_install_path):
+            system.rmtree(self.project.packages_install_path)
 
-        system.make_directory(self.config.packages_install_path)
+        system.make_directory(self.project.packages_install_path)
 
-        packages_lock_dict = package_data_from_root(self.config.project_root, "package-lock.yml")
+        packages_lock_dict = package_data_from_root(self.project.project_root, "package-lock.yml")
         packages_lock_config = package_config_from_data(packages_lock_dict).packages
 
         if not packages_lock_config:
@@ -109,7 +110,7 @@ class DepsTask(BaseTask):
 
         with downloads_directory():
             lock_defined_deps = resolve_lock_packages(packages_lock_config)
-            renderer = DbtProjectYamlRenderer(self.config, self.config.cli_vars)
+            renderer = DbtProjectYamlRenderer(None, self.cli_vars)
 
             packages_to_upgrade = []
 
@@ -119,7 +120,7 @@ class DepsTask(BaseTask):
                 version = package.get_version()
 
                 fire_event(DepsStartPackageInstall(package_name=package_name))
-                package.install(self.config, renderer)
+                package.install(self.project, renderer)
 
                 fire_event(DepsInstallInfo(version_name=package.nice_version_name()))
 
@@ -143,24 +144,17 @@ class DepsTask(BaseTask):
                 fire_event(Formatting(""))
                 fire_event(DepsNotifyUpdatesAvailable(packages=ListOfStrings(packages_to_upgrade)))
 
-    @classmethod
-    def from_args(cls, args):
-        # deps needs to move to the project directory, as it does put files
-        # into the modules directory
-        move_to_nearest_project_dir(args)
-        return super().from_args(args)
-
 
 class LockTask(BaseTask):
-    ConfigType = UnsetProfileConfig
-
-    def __init__(self, args, config: UnsetProfileConfig):
-        super().__init__(args=args, config=config)
+    def __init__(self, args: Any, project: Project):
+        move_to_nearest_project_dir(project.project_root)
+        super().__init__(args=args, config=None, project=project)
+        self.cli_vars = args.vars
 
     def run(self):
-        lock_filepath = f"{self.config.project_root}/package-lock.yml"
+        lock_filepath = f"{self.project.project_root}/package-lock.yml"
 
-        packages = self.config.packages.packages
+        packages = self.packages.packages.packages
         packages_installed = {"packages": []}
 
         if not packages:
@@ -168,7 +162,7 @@ class LockTask(BaseTask):
             return
 
         with downloads_directory():
-            resolved_deps = resolve_packages(packages, self.config)
+            resolved_deps = resolve_packages(packages, self.project, self.cli_vars)
 
         # this loop is to create the package-lock.yml in the same format as original packages.yml
         # package-lock.yml includes both the stated packages in packages.yml along with dependent packages
@@ -185,10 +179,10 @@ class LockTask(BaseTask):
 
 
 class AddTask(BaseTask):
-    ConfigType = UnsetProfileConfig
-
-    def __init__(self, args, config: UnsetProfileConfig):
-        super().__init__(args=args, config=config)
+    def __init__(self, args: Any, project: Project):
+        move_to_nearest_project_dir(project.project_root)
+        super().__init__(args=args, config=None, project=project)
+        self.cli_vars = args.vars
 
     def check_for_duplicate_packages(self, packages_yml):
         """Loop through contents of `packages.yml` to ensure no duplicate package names + versions.
@@ -212,7 +206,7 @@ class AddTask(BaseTask):
         return packages_yml
 
     def run(self):
-        packages_yml_filepath = f"{self.config.project_root}/packages.yml"
+        packages_yml_filepath = f"{self.project.project_root}/packages.yml"
 
         if not system.path_exists(packages_yml_filepath):
             fire_event(DepsNoPackagesFound())
@@ -245,6 +239,6 @@ class AddTask(BaseTask):
 
         if not self.args.dry_run:
             fire_event(
-                DepsLockUpdating(lock_filepath=f"{self.config.project_root}/package-lock.yml")
+                DepsLockUpdating(lock_filepath=f"{self.project.project_root}/package-lock.yml")
             )
-            LockTask(self.args, self.config).run()
+            LockTask(self.args, self.project).run()
