@@ -441,7 +441,7 @@ class TestPartialParsingDependency:
 
     def test_parsing_with_dependency(self, project):
         run_dbt(["clean"])
-        run_dbt(["deps"])
+        run_dbt(["deps", "install"])
         run_dbt(["seed"])
         run_dbt(["run"])
 

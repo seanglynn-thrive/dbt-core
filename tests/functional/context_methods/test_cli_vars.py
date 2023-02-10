@@ -138,7 +138,7 @@ class TestCLIVarsPackages:
 
     def test_cli_vars_in_packages(self, project, packages_config):
         # Run working deps and run commands
-        run_dbt(["deps"])
+        run_dbt(["deps", "install"])
         results = run_dbt(["run"])
         assert len(results) == 1
 

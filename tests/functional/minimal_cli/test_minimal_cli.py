@@ -19,12 +19,12 @@ class TestMinimalCli(BaseConfigProject):
         assert "logs" in result.output
 
     def test_deps(self, runner, project):
-        result = runner.invoke(cli, ["deps"])
+        result = runner.invoke(cli, ["deps", "install"])
         assert "dbt-labs/dbt_utils" in result.output
         assert "1.0.0" in result.output
 
     def test_ls(self, runner, project):
-        runner.invoke(cli, ["deps"])
+        runner.invoke(cli, ["deps", "install"])
         ls_result = runner.invoke(cli, ["ls"])
         assert "1 seed" in ls_result.output
         assert "1 model" in ls_result.output
@@ -32,7 +32,7 @@ class TestMinimalCli(BaseConfigProject):
         assert "1 snapshot" in ls_result.output
 
     def test_build(self, runner, project):
-        runner.invoke(cli, ["deps"])
+        runner.invoke(cli, ["deps", "install"])
         result = runner.invoke(cli, ["build"])
         # 1 seed, 1 model, 2 tests
         assert "PASS=4" in result.output
@@ -44,7 +44,7 @@ class TestMinimalCli(BaseConfigProject):
         assert "SKIP=1" in result.output
 
     def test_docs_generate(self, runner, project):
-        runner.invoke(cli, ["deps"])
+        runner.invoke(cli, ["deps", "install"])
         result = runner.invoke(cli, ["docs", "generate"])
         assert "Building catalog" in result.output
         assert "Catalog written" in result.output

@@ -63,7 +63,7 @@ class TestSimpleDependencyWithConfigs(BaseTestSimpleDependencyWithConfigs):
         }
 
     def test_simple_dependency(self, project):
-        run_dbt(["deps"])
+        run_dbt(["deps", "install"])
         results = run_dbt()
         assert len(results) == 5
 
@@ -100,7 +100,7 @@ class TestSimpleDependencyWithOverriddenConfigs(BaseTestSimpleDependencyWithConf
         }
 
     def test_simple_dependency(self, project):
-        run_dbt(["deps"])
+        run_dbt(["deps", "install"])
         results = run_dbt(["run"])
         len(results) == 5
 

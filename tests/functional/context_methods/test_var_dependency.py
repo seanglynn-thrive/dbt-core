@@ -47,7 +47,7 @@ class TestVarDependencyInheritance(FirstDependencyProject):
         }
 
     def test_var_mutual_overrides_v1_conversion(self, project, first_dependency):
-        run_dbt(["deps"])
+        run_dbt(["deps", "install"])
         assert len(run_dbt(["seed"])) == 2
         assert len(run_dbt(["run"])) == 2
         check_relations_equal(project.adapter, ["root_model_expected", "model"])

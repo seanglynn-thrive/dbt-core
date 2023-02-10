@@ -106,7 +106,7 @@ class TestAllowSecretProfilePackage(FirstDependencyProject):
         }
 
     def test_allow_secrets(self, project, first_dependency):
-        _, log_output = run_dbt_and_capture(["deps"])
+        _, log_output = run_dbt_and_capture(["deps", "install"])
         assert not ("first_dependency" in log_output)
 
 
@@ -131,7 +131,7 @@ class TestCloneFailSecretScrubbed:
 
     def test_fail_clone_with_scrubbing(self, project):
         with pytest.raises(DbtInternalError) as excinfo:
-            _, log_output = run_dbt_and_capture(["deps"])
+            _, log_output = run_dbt_and_capture(["deps", "install"])
 
         assert "abc123" not in str(excinfo.value)
 
@@ -150,7 +150,7 @@ class TestCloneFailSecretNotRendered(TestCloneFailSecretScrubbed):
 
     def test_fail_clone_with_scrubbing(self, project):
         with pytest.raises(DbtInternalError) as excinfo:
-            _, log_output = run_dbt_and_capture(["deps"])
+            _, log_output = run_dbt_and_capture(["deps", "install"])
 
         # we should not see any manipulated form of the secret value (abc123) here
         # we should see a manipulated form of the placeholder instead

@@ -20,7 +20,7 @@ class TestDbtRunner:
         with pytest.raises(dbtUsageException):
             # dbt.invoke(["--warn-error", "--warn-error-options", '{"include": "all"}', "deps"])
             dbt.invoke(
-                ["--warn-error", "--warn-error-options", '{"include": "all"}', "deps install"]
+                ["--warn-error", "--warn-error-options", '{"include": "all"}', "deps", "install"]
             )
 
     def test_invalid_command(self, dbt: dbtRunner) -> None:

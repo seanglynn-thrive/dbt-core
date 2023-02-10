@@ -73,7 +73,7 @@ class SimpleDependencyBase(object):
     # These two functions included to enable override in ...NoProfile derived test class
     @pytest.fixture(scope="class")
     def run_deps(self, project):
-        return run_dbt(["deps"])
+        return run_dbt(["deps", "install"])
 
     @pytest.fixture(scope="function")
     def run_clean(self, project):
@@ -111,7 +111,7 @@ class TestSimpleDependencyNoProfile(SimpleDependencyBase):
     @pytest.fixture(scope="class")
     def run_deps(self, project):
         with tempfile.TemporaryDirectory() as tmpdir:
-            result = run_dbt(["deps", "--profiles-dir", tmpdir])
+            result = run_dbt(["deps", "install", "--profiles-dir", tmpdir])
         return result
 
     @pytest.fixture(scope="class")
@@ -159,7 +159,7 @@ class TestSimpleDependencyUnpinned(object):
         }
 
     def test_simple_dependency(self, project):
-        run_dbt(["deps"])
+        run_dbt(["deps", "install"])
 
 
 class TestSimpleDependencyWithDuplicates(object):
@@ -180,7 +180,7 @@ class TestSimpleDependencyWithDuplicates(object):
         }
 
     def test_simple_dependency_deps(self, project):
-        run_dbt(["deps"])
+        run_dbt(["deps", "install"])
 
 
 class TestRekeyedDependencyWithSubduplicates(object):
@@ -202,7 +202,7 @@ class TestRekeyedDependencyWithSubduplicates(object):
         }
 
     def test_simple_dependency_deps(self, project):
-        run_dbt(["deps"])
+        run_dbt(["deps", "install"])
         assert len(os.listdir("dbt_packages")) == 2
 
 
@@ -223,7 +223,7 @@ class DependencyBranchBase(object):
         }
 
     def deps_run_assert_equality(self, project):
-        run_dbt(["deps"])
+        run_dbt(["deps", "install"])
         results = run_dbt()
         assert len(results) == 4
 
@@ -302,5 +302,5 @@ class TestSimpleDependencyBadProfile(object):
 
     def test_deps_bad_profile(self, project):
         del os.environ["PROFILE_TEST_HOST"]
-        run_dbt(["deps"])
+        run_dbt(["deps", "install"])
         run_dbt(["clean"])

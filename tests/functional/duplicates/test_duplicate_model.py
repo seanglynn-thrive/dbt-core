@@ -106,7 +106,7 @@ class TestDuplicateModelEnabledAcrossPackages:
         return {"packages": [{"local": "local_dependency"}]}
 
     def test_duplicate_model_enabled_across_packages(self, project):
-        run_dbt(["deps"])
+        run_dbt(["deps", "install"])
         message = "dbt found two models with the name"
         with pytest.raises(DuplicateResourceNameError) as exc:
             run_dbt(["run"])
@@ -131,7 +131,7 @@ class TestDuplicateModelDisabledAcrossPackages:
         return {"packages": [{"local": "local_dependency"}]}
 
     def test_duplicate_model_disabled_across_packages(self, project):
-        run_dbt(["deps"])
+        run_dbt(["deps", "install"])
         results = run_dbt(["compile"])
         assert len(results) == 1
 

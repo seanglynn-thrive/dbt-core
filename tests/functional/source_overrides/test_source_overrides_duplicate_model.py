@@ -55,7 +55,7 @@ class TestSourceOverrideDuplicates:
         }
 
     def test_source_duplicate_overrides(self, project):
-        run_dbt(["deps"])
+        run_dbt(["deps", "install"])
         with pytest.raises(CompilationError) as exc:
             run_dbt(["compile"])
 

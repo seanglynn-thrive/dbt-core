@@ -149,7 +149,7 @@ class TestCustomSchemaWithPrefixAndDispatch(BaseTestCustomSchema):
         self, project, macros, project_config_update
     ):
         project.run_sql(_VALIDATION_SQL)
-        run_dbt(["deps"])
+        run_dbt(["deps", "install"])
         run_dbt(["seed"])
         results = run_dbt(["run"])
         assert len(results) == 3

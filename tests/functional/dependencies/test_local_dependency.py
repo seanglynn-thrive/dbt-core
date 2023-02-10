@@ -133,7 +133,7 @@ class BaseDependencyTest(object):
 
 class TestSimpleDependency(BaseDependencyTest):
     def test_local_dependency(self, project):
-        run_dbt(["deps"])
+        run_dbt(["deps", "install"])
         run_dbt(["seed"])
         results = run_dbt()
         assert len(results) == 5
@@ -156,7 +156,7 @@ class TestSimpleDependency(BaseDependencyTest):
         )
 
     def test_no_dependency_paths(self, project):
-        run_dbt(["deps"])
+        run_dbt(["deps", "install"])
         run_dbt(["seed"])
 
         # prove dependency does not exist as model in project
@@ -206,7 +206,7 @@ class TestSimpleDependencyWithSchema(BaseDependencyTest):
     @mock.patch("dbt.config.project.get_installed_version")
     def test_local_dependency_out_of_date(self, mock_get, project):
         mock_get.return_value = dbt.semver.VersionSpecifier.from_version_string("0.0.1")
-        run_dbt(["deps"] + self.dbt_vargs(project.test_schema))
+        run_dbt(["deps", "install"] + self.dbt_vargs(project.test_schema))
         # check seed
         with pytest.raises(dbt.exceptions.DbtProjectError) as exc:
             run_dbt(["seed"] + self.dbt_vargs(project.test_schema))
@@ -219,7 +219,7 @@ class TestSimpleDependencyWithSchema(BaseDependencyTest):
     @mock.patch("dbt.config.project.get_installed_version")
     def test_local_dependency_out_of_date_no_check(self, mock_get):
         mock_get.return_value = dbt.semver.VersionSpecifier.from_version_string("0.0.1")
-        run_dbt(["deps"])
+        run_dbt(["deps", "install"])
         run_dbt(["seed", "--no-version-check"])
         results = run_dbt(["run", "--no-version-check"])
         assert len(results) == 5
@@ -261,7 +261,7 @@ class TestSimpleDependencyNoVersionCheckConfig(BaseDependencyTest):
         )
 
         mock_get.return_value = dbt.semver.VersionSpecifier.from_version_string("0.0.1")
-        run_dbt(["deps", "--vars", vars_arg])
+        run_dbt(["deps", "install", "--vars", vars_arg])
         run_dbt(["seed", "--vars", vars_arg])
         results = run_dbt(["run", "--vars", vars_arg])
         len(results) == 5
@@ -310,7 +310,7 @@ class TestSimpleDependencyHooks(BaseDependencyTest):
             }
         )
 
-        run_dbt(["deps", "--vars", cli_vars])
+        run_dbt(["deps", "install", "--vars", cli_vars])
         results = run_dbt(["run", "--vars", cli_vars])
         assert len(results) == 2
         check_relations_equal(project.adapter, ["actual", "expected"])
@@ -334,7 +334,7 @@ class TestSimpleDependencyDuplicateName(BaseDependencyTest):
 
     def test_local_dependency_same_name(self, prepare_dependencies, project):
         with pytest.raises(dbt.exceptions.DependencyError):
-            run_dbt(["deps"], expect_pass=False)
+            run_dbt(["deps", "install"], expect_pass=False)
 
     def test_local_dependency_same_name_sneaky(self, prepare_dependencies, project):
         shutil.copytree("duplicate_dependency", "./dbt_packages/duplicate_dependency")
