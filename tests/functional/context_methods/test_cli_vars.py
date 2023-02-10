@@ -149,10 +149,12 @@ class TestCLIVarsPackages:
 
         # Without vars args deps fails
         with pytest.raises(DbtRuntimeError):
-            run_dbt(["deps"])
+            run_dbt(["deps", "install"])
 
         # With vars arg deps succeeds
-        results = run_dbt(["deps", "--vars", "path_to_project: dbt_integration_project"])
+        results = run_dbt(
+            ["deps", "install", "--vars", "path_to_project: dbt_integration_project"]
+        )
         assert results is None
 
 
