@@ -256,6 +256,11 @@ sample_values = [
     RegistryResponseMissingNestedKeys(response=""),
     RegistryResponseExtraNestedKeys(response=""),
     DepsSetDownloadDirectory(path=""),
+    DepsLockCreated(lock_filepath=""),
+    DepsLockUpdating(lock_filepath=""),
+    DepsAddPackage(package_name="", version="", packages_filepath=""),
+    DepsFoundDuplicatePackage(removed_package={}),
+    DepsVersionMissing(source=""),
     # Q - Node execution ======================
     RunningOperationCaughtError(exc=""),
     CompileComplete(),
