@@ -41,7 +41,7 @@ def _dbt_psycopg2_name():
 
 
 package_name = "dbt-postgres"
-package_version = "1.5.0rc1"
+package_version = "1.5.0rc1.dev04142023"
 description = """The postgres adapter plugin for dbt (data build tool)"""
 
 this_directory = os.path.abspath(os.path.dirname(__file__))
