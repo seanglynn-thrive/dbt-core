@@ -1,14 +1,30 @@
+{% macro resolve_model_name(input_model_name) %}
+    {{ return(adapter.dispatch('resolve_model_name', 'dbt')(input_model_name)) }}
+{% endmacro %}
+
+{%- macro default__resolve_model_name(input_model_name) -%}
+    {{  input_model_name | string | replace('"', '\"') }}
+{%- endmacro -%}
+
 {% macro build_ref_function(model) %}
 
     {%- set ref_dict = {} -%}
     {%- for _ref in model.refs -%}
-        {%- set resolved = ref(*_ref) -%}
-        {%- do ref_dict.update({_ref | join("."): resolved | string | replace('"', '\"')}) -%}
+        {% set _ref_args = [_ref.get('package'), _ref['name']] if _ref.get('package') else [_ref['name'],] %}
+        {%- set resolved = ref(*_ref_args, v=_ref.get('version')) -%}
+        {%- if _ref.get('version') -%}
+            {% do _ref_args.extend(["v" ~ _ref['version']]) %}
+        {%- endif -%}
+       {%- do ref_dict.update({_ref_args | join('.'): resolve_model_name(resolved)}) -%}
     {%- endfor -%}
 
-def ref(*args,dbt_load_df_function):
+def ref(*args, **kwargs):
     refs = {{ ref_dict | tojson }}
-    key = ".".join(args)
+    key = '.'.join(args)
+    version = kwargs.get("v") or kwargs.get("version")
+    if version:
+        key += f".v{version}"
+    dbt_load_df_function = kwargs.get("dbt_load_df_function")
     return dbt_load_df_function(refs[key])
 
 {% endmacro %}
@@ -18,12 +34,12 @@ def ref(*args,dbt_load_df_function):
     {%- set source_dict = {} -%}
     {%- for _source in model.sources -%}
         {%- set resolved = source(*_source) -%}
-        {%- do source_dict.update({_source | join("."): resolved | string | replace('"', '\"')}) -%}
+        {%- do source_dict.update({_source | join('.'): resolve_model_name(resolved)}) -%}
     {%- endfor -%}
 
 def source(*args, dbt_load_df_function):
     sources = {{ source_dict | tojson }}
-    key = ".".join(args)
+    key = '.'.join(args)
     return dbt_load_df_function(sources[key])
 
 {% endmacro %}
@@ -65,15 +81,15 @@ class this:
     database = "{{ this.database }}"
     schema = "{{ this.schema }}"
     identifier = "{{ this.identifier }}"
-    {% set this_relation_name = this | string | replace('"', '\\"') %}
+    {% set this_relation_name = resolve_model_name(this) %}
     def __repr__(self):
-        return "{{ this_relation_name  }}"
+        return '{{ this_relation_name  }}'
 
 
 class dbtObj:
     def __init__(self, load_df_function) -> None:
         self.source = lambda *args: source(*args, dbt_load_df_function=load_df_function)
-        self.ref = lambda *args: ref(*args, dbt_load_df_function=load_df_function)
+        self.ref = lambda *args, **kwargs: ref(*args, **kwargs, dbt_load_df_function=load_df_function)
         self.config = config
         self.this = this()
         self.is_incremental = {{ is_incremental() }}

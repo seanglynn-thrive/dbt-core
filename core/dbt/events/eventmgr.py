@@ -1,3 +1,4 @@
+import os
 from colorama import Style
 from dataclasses import dataclass
 from datetime import datetime
@@ -6,11 +7,13 @@ import json
 import logging
 from logging.handlers import RotatingFileHandler
 import threading
-from typing import Any, Callable, List, Optional, TextIO
+import traceback
+from typing import Any, Callable, List, Optional, TextIO, Protocol
 from uuid import uuid4
+from dbt.events.format import timestamp_to_datetime_string
 
 from dbt.events.base_types import BaseEvent, EventLevel, msg_from_base_event, EventMsg
-
+import dbt.utils
 
 # A Filter is a function which takes a BaseEvent and returns True if the event
 # should be logged, False otherwise.
@@ -77,6 +80,7 @@ class LoggerConfig:
     use_colors: bool = False
     output_stream: Optional[TextIO] = None
     output_file_name: Optional[str] = None
+    output_file_max_bytes: Optional[int] = 10 * 1024 * 1024  # 10 mb
     logger: Optional[Any] = None
 
 
@@ -88,41 +92,41 @@ class _Logger:
         self.level: EventLevel = config.level
         self.event_manager: EventManager = event_manager
         self._python_logger: Optional[logging.Logger] = config.logger
-        self._stream: Optional[TextIO] = config.output_stream
+
+        if config.output_stream is not None:
+            stream_handler = logging.StreamHandler(config.output_stream)
+            self._python_logger = self._get_python_log_for_handler(stream_handler)
 
         if config.output_file_name:
-            log = logging.getLogger(config.name)
-            log.setLevel(_log_level_map[config.level])
-            handler = RotatingFileHandler(
+            file_handler = RotatingFileHandler(
                 filename=str(config.output_file_name),
                 encoding="utf8",
-                maxBytes=10 * 1024 * 1024,  # 10 mb
+                maxBytes=config.output_file_max_bytes,  # type: ignore
                 backupCount=5,
             )
+            self._python_logger = self._get_python_log_for_handler(file_handler)
 
-            handler.setFormatter(logging.Formatter(fmt="%(message)s"))
-            log.handlers.clear()
-            log.addHandler(handler)
-
-            self._python_logger = log
+    def _get_python_log_for_handler(self, handler: logging.Handler):
+        log = logging.getLogger(self.name)
+        log.setLevel(_log_level_map[self.level])
+        handler.setFormatter(logging.Formatter(fmt="%(message)s"))
+        log.handlers.clear()
+        log.propagate = False
+        log.addHandler(handler)
+        return log
 
     def create_line(self, msg: EventMsg) -> str:
         raise NotImplementedError()
 
     def write_line(self, msg: EventMsg):
         line = self.create_line(msg)
-        python_level = _log_level_map[EventLevel(msg.info.level)]
         if self._python_logger is not None:
             send_to_logger(self._python_logger, msg.info.level, line)
-        elif self._stream is not None and _log_level_map[self.level] <= python_level:
-            self._stream.write(line + "\n")
 
     def flush(self):
         if self._python_logger is not None:
             for handler in self._python_logger.handlers:
                 handler.flush()
-        elif self._stream is not None:
-            self._stream.flush()
 
 
 class _TextLogger(_Logger):
@@ -143,12 +147,10 @@ class _TextLogger(_Logger):
         log_line: str = ""
         # Create a separator if this is the beginning of an invocation
         # TODO: This is an ugly hack, get rid of it if we can
+        ts: str = timestamp_to_datetime_string(msg.info.ts)
         if msg.info.name == "MainReportVersion":
             separator = 30 * "="
-            log_line = (
-                f"\n\n{separator} {msg.info.ts} | {self.event_manager.invocation_id} {separator}\n"
-            )
-        ts: str = msg.info.ts.strftime("%H:%M:%S.%f")
+            log_line = f"\n\n{separator} {ts} | {self.event_manager.invocation_id} {separator}\n"
         scrubbed_msg: str = self.scrubber(msg.info.msg)  # type: ignore
         level = msg.info.level
         log_line += (
@@ -174,7 +176,7 @@ class _JsonLogger(_Logger):
         from dbt.events.functions import msg_to_dict
 
         msg_dict = msg_to_dict(msg)
-        raw_log_line = json.dumps(msg_dict, sort_keys=True)
+        raw_log_line = json.dumps(msg_dict, sort_keys=True, cls=dbt.utils.ForgivingJSONEncoder)
         line = self.scrubber(raw_log_line)  # type: ignore
         return line
 
@@ -185,8 +187,18 @@ class EventManager:
         self.callbacks: List[Callable[[EventMsg], None]] = []
         self.invocation_id: str = str(uuid4())
 
-    def fire_event(self, e: BaseEvent, level: EventLevel = None) -> None:
+    def fire_event(self, e: BaseEvent, level: Optional[EventLevel] = None) -> None:
         msg = msg_from_base_event(e, level=level)
+
+        if os.environ.get("DBT_TEST_BINARY_SERIALIZATION"):
+            print(f"--- {msg.info.name}")
+            try:
+                msg.SerializeToString()
+            except Exception as exc:
+                raise Exception(
+                    f"{msg.info.name} is not serializable to binary. Originating exception: {exc}, {traceback.format_exc()}"
+                )
+
         for logger in self.loggers:
             if logger.filter(msg):  # type: ignore
                 logger.write_line(msg)
@@ -194,7 +206,7 @@ class EventManager:
         for callback in self.callbacks:
             callback(msg)
 
-    def add_logger(self, config: LoggerConfig):
+    def add_logger(self, config: LoggerConfig) -> None:
         logger = (
             _JsonLogger(self, config)
             if config.line_format == LineFormat.Json
@@ -206,3 +218,25 @@ class EventManager:
     def flush(self):
         for logger in self.loggers:
             logger.flush()
+
+
+class IEventManager(Protocol):
+    callbacks: List[Callable[[EventMsg], None]]
+    invocation_id: str
+
+    def fire_event(self, e: BaseEvent, level: Optional[EventLevel] = None) -> None:
+        ...
+
+    def add_logger(self, config: LoggerConfig) -> None:
+        ...
+
+
+class TestEventManager(IEventManager):
+    def __init__(self):
+        self.event_history = []
+
+    def fire_event(self, e: BaseEvent, level: Optional[EventLevel] = None) -> None:
+        self.event_history.append((e, level))
+
+    def add_logger(self, config: LoggerConfig) -> None:
+        raise NotImplementedError()

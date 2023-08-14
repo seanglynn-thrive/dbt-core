@@ -1,17 +1,16 @@
 from typing import Any, Optional
 import yaml
-
+from pathlib import Path
 import dbt.utils
 import dbt.deprecations
 import dbt.exceptions
 
 from dbt.config.renderer import DbtProjectYamlRenderer
-from dbt.config.project import package_config_from_data, package_data_from_root
+from dbt.config.project import package_config_from_data, package_and_project_data_from_root
 from dbt.deps.base import downloads_directory
 from dbt.deps.resolver import resolve_lock_packages, resolve_packages
 from dbt.deps.registry import RegistryPinnedPackage
 
-from dbt.events.proto_types import ListOfStrings
 from dbt.events.functions import fire_event
 from dbt.events.types import (
     DepsAddPackage,
@@ -68,6 +67,12 @@ def _create_packages_yml_entry(package, version, source):
 
 class DepsTask(BaseTask):
     def __init__(self, args: Any, project: Project):
+        # N.B. This is a temporary fix for a bug when using relative paths via
+        # --project-dir with deps.  A larger overhaul of our path handling methods
+        # is needed to fix this the "right" way.
+        # See GH-7615
+        project.project_root = str(Path(project.project_root).resolve())
+
         move_to_nearest_project_dir(project.project_root)
         super().__init__(args=args, config=None, project=project)
         self.cli_vars = args.vars
@@ -101,7 +106,9 @@ class DepsTask(BaseTask):
 
         system.make_directory(self.project.packages_install_path)
 
-        packages_lock_dict = package_data_from_root(self.project.project_root, "package-lock.yml")
+        packages_lock_dict, _ = package_and_project_data_from_root(
+            self.project.project_root, "package-lock.yml"
+        )
         packages_lock_config = package_config_from_data(packages_lock_dict).packages
 
         if not packages_lock_config:
@@ -142,7 +149,7 @@ class DepsTask(BaseTask):
 
             if packages_to_upgrade:
                 fire_event(Formatting(""))
-                fire_event(DepsNotifyUpdatesAvailable(packages=ListOfStrings(packages_to_upgrade)))
+                fire_event(DepsNotifyUpdatesAvailable(packages=packages_to_upgrade))
 
 
 class LockTask(BaseTask):

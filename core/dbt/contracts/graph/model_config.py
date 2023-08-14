@@ -2,15 +2,17 @@ from dataclasses import field, Field, dataclass
 from enum import Enum
 from itertools import chain
 from typing import Any, List, Optional, Dict, Union, Type, TypeVar, Callable
+
 from dbt.dataclass_schema import (
     dbtClassMixin,
     ValidationError,
     register_pattern,
+    StrEnum,
 )
 from dbt.contracts.graph.unparsed import AdditionalPropertiesAllowed, Docs
 from dbt.contracts.graph.utils import validate_color
-from dbt.exceptions import DbtInternalError, CompilationError
 from dbt.contracts.util import Replaceable, list_str
+from dbt.exceptions import DbtInternalError, CompilationError
 from dbt import hooks
 from dbt.node_types import NodeType
 
@@ -189,6 +191,21 @@ class Severity(str):
 register_pattern(Severity, insensitive_patterns("warn", "error"))
 
 
+class OnConfigurationChangeOption(StrEnum):
+    Apply = "apply"
+    Continue = "continue"
+    Fail = "fail"
+
+    @classmethod
+    def default(cls) -> "OnConfigurationChangeOption":
+        return cls.Apply
+
+
+@dataclass
+class ContractConfig(dbtClassMixin, Replaceable):
+    enforced: bool = False
+
+
 @dataclass
 class Hook(dbtClassMixin, Replaceable):
     sql: str
@@ -282,11 +299,17 @@ class BaseConfig(AdditionalPropertiesAllowed, Replaceable):
                     return False
         return True
 
-    # This is used in 'add_config_call' to created the combined config_call_dict.
+    # This is used in 'add_config_call' to create the combined config_call_dict.
     # 'meta' moved here from node
     mergebehavior = {
         "append": ["pre-hook", "pre_hook", "post-hook", "post_hook", "tags"],
-        "update": ["quoting", "column_types", "meta", "docs"],
+        "update": [
+            "quoting",
+            "column_types",
+            "meta",
+            "docs",
+            "contract",
+        ],
         "dict_key_append": ["grants"],
     }
 
@@ -364,8 +387,14 @@ class BaseConfig(AdditionalPropertiesAllowed, Replaceable):
 
 
 @dataclass
+class SemanticModelConfig(BaseConfig):
+    enabled: bool = True
+
+
+@dataclass
 class MetricConfig(BaseConfig):
     enabled: bool = True
+    group: Optional[str] = None
 
 
 @dataclass
@@ -403,6 +432,10 @@ class NodeAndTestConfig(BaseConfig):
         default_factory=dict,
         metadata=MergeBehavior.Update.meta(),
     )
+    group: Optional[str] = field(
+        default=None,
+        metadata=CompareBehavior.Exclude.meta(),
+    )
 
 
 @dataclass
@@ -435,6 +468,9 @@ class NodeConfig(NodeAndTestConfig):
     # sometimes getting the Union order wrong, causing serialization failures.
     unique_key: Union[str, List[str], None] = None
     on_schema_change: Optional[str] = "ignore"
+    on_configuration_change: OnConfigurationChangeOption = field(
+        default_factory=OnConfigurationChangeOption.default
+    )
     grants: Dict[str, Any] = field(
         default_factory=dict, metadata=MergeBehavior.DictKeyAppend.meta()
     )
@@ -446,9 +482,13 @@ class NodeConfig(NodeAndTestConfig):
         default_factory=Docs,
         metadata=MergeBehavior.Update.meta(),
     )
+    contract: ContractConfig = field(
+        default_factory=ContractConfig,
+        metadata=MergeBehavior.Update.meta(),
+    )
 
-    # we validate that node_color has a suitable value to prevent dbt-docs from crashing
     def __post_init__(self):
+        # we validate that node_color has a suitable value to prevent dbt-docs from crashing
         if self.docs.node_color:
             node_color = self.docs.node_color
             if not validate_color(node_color):
@@ -456,6 +496,17 @@ class NodeConfig(NodeAndTestConfig):
                     f"Invalid color name for docs.node_color: {node_color}. "
                     "It is neither a valid HTML color name nor a valid HEX code."
                 )
+
+        if (
+            self.contract.enforced
+            and self.materialized == "incremental"
+            and self.on_schema_change not in ("append_new_columns", "fail")
+        ):
+            raise ValidationError(
+                f"Invalid value for on_schema_change: {self.on_schema_change}. Models "
+                "materialized as incremental with contracts enabled must set "
+                "on_schema_change to 'append_new_columns' or 'fail'"
+            )
 
     @classmethod
     def __pre_deserialize__(cls, data):
@@ -493,6 +544,7 @@ class NodeConfig(NodeAndTestConfig):
 @dataclass
 class SeedConfig(NodeConfig):
     materialized: str = "seed"
+    delimiter: str = ","
     quote_columns: Optional[bool] = None
 
     @classmethod
@@ -504,6 +556,8 @@ class SeedConfig(NodeConfig):
 
 @dataclass
 class TestConfig(NodeAndTestConfig):
+    __test__ = False
+
     # this is repeated because of a different default
     schema: Optional[str] = field(
         default="dbt_test__audit",
@@ -566,6 +620,8 @@ class SnapshotConfig(EmptySnapshotConfig):
     @classmethod
     def validate(cls, data):
         super().validate(data)
+        # Note: currently you can't just set these keys in schema.yml because this validation
+        # will fail when parsing the snapshot node.
         if not data.get("strategy") or not data.get("unique_key") or not data.get("target_schema"):
             raise ValidationError(
                 "Snapshots must be configured with a 'strategy', 'unique_key', "
@@ -596,6 +652,7 @@ class SnapshotConfig(EmptySnapshotConfig):
         if data.get("materialized") and data.get("materialized") != "snapshot":
             raise ValidationError("A snapshot must have a materialized value of 'snapshot'")
 
+    # Called by "calculate_node_config_dict" in ContextConfigGenerator
     def finalize_and_validate(self):
         data = self.to_dict(omit_none=True)
         self.validate(data)

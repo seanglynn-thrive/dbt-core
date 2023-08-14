@@ -19,6 +19,7 @@ def get_rendered_model_config(**updates):
         "schema": None,
         "alias": None,
         "enabled": True,
+        "group": None,
         "materialized": "view",
         "pre-hook": [],
         "post-hook": [],
@@ -28,12 +29,14 @@ def get_rendered_model_config(**updates):
         "persist_docs": {},
         "full_refresh": None,
         "on_schema_change": "ignore",
+        "on_configuration_change": "apply",
         "meta": {},
         "unique_key": None,
         "grants": {},
         "packages": [],
         "incremental_strategy": None,
         "docs": {"node_color": None, "show": True},
+        "contract": {"enforced": False},
     }
     result.update(updates)
     return result
@@ -46,16 +49,19 @@ def get_unrendered_model_config(**updates):
 def get_rendered_seed_config(**updates):
     result = {
         "enabled": True,
+        "group": None,
         "materialized": "seed",
         "persist_docs": {},
         "pre-hook": [],
         "post-hook": [],
         "column_types": {},
+        "delimiter": ",",
         "quoting": {},
         "tags": [],
         "quote_columns": True,
         "full_refresh": None,
         "on_schema_change": "ignore",
+        "on_configuration_change": "apply",
         "database": None,
         "schema": None,
         "alias": None,
@@ -65,6 +71,7 @@ def get_rendered_seed_config(**updates):
         "packages": [],
         "incremental_strategy": None,
         "docs": {"node_color": None, "show": True},
+        "contract": {"enforced": False},
     }
     result.update(updates)
     return result
@@ -82,6 +89,7 @@ def get_rendered_snapshot_config(**updates):
         "schema": None,
         "alias": None,
         "enabled": True,
+        "group": None,
         "materialized": "snapshot",
         "pre-hook": [],
         "post-hook": [],
@@ -91,6 +99,7 @@ def get_rendered_snapshot_config(**updates):
         "persist_docs": {},
         "full_refresh": None,
         "on_schema_change": "ignore",
+        "on_configuration_change": "apply",
         "strategy": "check",
         "check_cols": "all",
         "unique_key": "id",
@@ -102,6 +111,7 @@ def get_rendered_snapshot_config(**updates):
         "packages": [],
         "incremental_strategy": None,
         "docs": {"node_color": None, "show": True},
+        "contract": {"enforced": False},
     }
     result.update(updates)
     return result
@@ -116,6 +126,7 @@ def get_unrendered_snapshot_config(**updates):
 def get_rendered_tst_config(**updates):
     result = {
         "enabled": True,
+        "group": None,
         "materialized": "test",
         "tags": [],
         "severity": "ERROR",
@@ -160,7 +171,8 @@ def checksum_file(path):
     silly things if we just open(..., 'r').encode('utf-8').
     """
     with open(path, "rb") as fp:
-        hashed = hashlib.sha256(fp.read()).hexdigest()
+        # We strip the file contents because we want the checksum to match the stored contents
+        hashed = hashlib.sha256(fp.read().strip()).hexdigest()
     return {
         "name": "sha256",
         "checksum": hashed,
@@ -252,15 +264,17 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                 "package_name": "test",
                 "raw_code": LineIndifferent(model_raw_code),
                 "language": "sql",
-                "refs": [["seed"]],
+                "refs": [{"name": "seed", "package": None, "version": None}],
                 "sources": [],
                 "depends_on": {"nodes": ["seed.test.seed"], "macros": []},
+                "deprecation_date": None,
                 "unique_id": "model.test.model",
                 "fqn": ["test", "model"],
                 "metrics": [],
                 "tags": [],
                 "meta": {},
                 "config": model_config,
+                "group": None,
                 "schema": my_schema_name,
                 "database": model_database,
                 "deferred": False,
@@ -274,6 +288,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                     "first_name": {
                         "name": "first_name",
@@ -282,6 +297,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                     "email": {
                         "name": "email",
@@ -290,6 +306,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                     "ip_address": {
                         "name": "ip_address",
@@ -298,6 +315,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                     "updated_at": {
                         "name": "updated_at",
@@ -306,8 +324,11 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                 },
+                "contract": {"checksum": None, "enforced": False},
+                "constraints": [],
                 "patch_path": "test://" + model_schema_yml_path,
                 "docs": {"node_color": None, "show": False},
                 "compiled": True,
@@ -316,6 +337,9 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                 "extra_ctes": [],
                 "checksum": checksum_file(model_sql_path),
                 "unrendered_config": unrendered_model_config,
+                "access": "protected",
+                "version": None,
+                "latest_version": None,
             },
             "model.test.second_model": {
                 "compiled_path": os.path.join(compiled_model_path, "second_model.sql"),
@@ -333,15 +357,17 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                     read_file_replace_returns(second_model_sql_path).rstrip("\r\n")
                 ),
                 "language": "sql",
-                "refs": [["seed"]],
+                "refs": [{"name": "seed", "package": None, "version": None}],
                 "sources": [],
                 "depends_on": {"nodes": ["seed.test.seed"], "macros": []},
+                "deprecation_date": None,
                 "unique_id": "model.test.second_model",
                 "fqn": ["test", "second_model"],
                 "metrics": [],
                 "tags": [],
                 "meta": {},
                 "config": second_config,
+                "group": None,
                 "schema": alternate_schema,
                 "database": project.database,
                 "deferred": False,
@@ -355,6 +381,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                     "first_name": {
                         "name": "first_name",
@@ -363,6 +390,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                     "email": {
                         "name": "email",
@@ -371,6 +399,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                     "ip_address": {
                         "name": "ip_address",
@@ -379,6 +408,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                     "updated_at": {
                         "name": "updated_at",
@@ -387,8 +417,11 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                 },
+                "contract": {"checksum": None, "enforced": False},
+                "constraints": [],
                 "patch_path": "test://" + model_schema_yml_path,
                 "docs": {"node_color": None, "show": False},
                 "compiled": True,
@@ -397,11 +430,15 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                 "extra_ctes": [],
                 "checksum": checksum_file(second_model_sql_path),
                 "unrendered_config": unrendered_second_config,
+                "access": "protected",
+                "version": None,
+                "latest_version": None,
             },
             "seed.test.seed": {
                 "build_path": None,
                 "created_at": ANY,
                 "config": seed_config,
+                "group": None,
                 "patch_path": "test://" + seed_schema_yml_path,
                 "path": "seed.csv",
                 "name": "seed",
@@ -428,6 +465,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                     "first_name": {
                         "name": "first_name",
@@ -436,6 +474,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                     "email": {
                         "name": "email",
@@ -444,6 +483,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                     "ip_address": {
                         "name": "ip_address",
@@ -452,6 +492,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                     "updated_at": {
                         "name": "updated_at",
@@ -460,6 +501,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                 },
                 "docs": {"node_color": None, "show": True},
@@ -471,6 +513,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
             },
             "test.test.not_null_model_id.d01cc630e6": {
                 "alias": "not_null_model_id",
+                "attached_node": "model.test.model",
                 "compiled_path": os.path.join(
                     compiled_model_path, "schema.yml", "not_null_model_id.sql"
                 ),
@@ -480,6 +523,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                 "columns": {},
                 "config": test_config,
                 "sources": [],
+                "group": None,
                 "depends_on": {
                     "macros": ["macro.dbt.test_not_null", "macro.dbt.get_where_subquery"],
                     "nodes": ["model.test.model"],
@@ -496,7 +540,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                 "path": "not_null_model_id.sql",
                 "raw_code": "{{ test_not_null(**_dbt_generic_test_kwargs) }}",
                 "language": "sql",
-                "refs": [["model"]],
+                "refs": [{"name": "model", "package": None, "version": None}],
                 "relation_name": None,
                 "resource_type": "test",
                 "schema": test_audit_schema,
@@ -519,6 +563,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                 },
                 "checksum": {"name": "none", "checksum": ""},
                 "unrendered_config": unrendered_test_config,
+                "contract": {"checksum": None, "enforced": False},
             },
             "snapshot.test.snapshot_seed": {
                 "alias": "snapshot_seed",
@@ -530,7 +575,9 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                 "compiled": True,
                 "compiled_code": ANY,
                 "config": snapshot_config,
+                "contract": {"checksum": None, "enforced": False},
                 "database": project.database,
+                "group": None,
                 "deferred": False,
                 "depends_on": {
                     "macros": [],
@@ -554,7 +601,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                     .replace("{% endsnapshot %}", "")
                 ),
                 "language": "sql",
-                "refs": [["seed"]],
+                "refs": [{"name": "seed", "package": None, "version": None}],
                 "relation_name": relation_name_node_format.format(
                     project.database, alternate_schema, "snapshot_seed"
                 ),
@@ -567,6 +614,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
             },
             "test.test.test_nothing_model_.5d38568946": {
                 "alias": "test_nothing_model_",
+                "attached_node": "model.test.model",
                 "compiled_path": os.path.join(
                     compiled_model_path, "schema.yml", "test_nothing_model_.sql"
                 ),
@@ -575,6 +623,8 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                 "column_name": None,
                 "columns": {},
                 "config": test_config,
+                "group": None,
+                "contract": {"checksum": None, "enforced": False},
                 "sources": [],
                 "depends_on": {
                     "macros": ["macro.test.test_nothing", "macro.dbt.get_where_subquery"],
@@ -592,7 +642,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                 "path": "test_nothing_model_.sql",
                 "raw_code": "{{ test.test_nothing(**_dbt_generic_test_kwargs) }}",
                 "language": "sql",
-                "refs": [["model"]],
+                "refs": [{"name": "model", "package": None, "version": None}],
                 "relation_name": None,
                 "resource_type": "test",
                 "schema": test_audit_schema,
@@ -617,6 +667,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
             },
             "test.test.unique_model_id.67b76558ff": {
                 "alias": "unique_model_id",
+                "attached_node": "model.test.model",
                 "compiled_path": os.path.join(
                     compiled_model_path, "schema.yml", "unique_model_id.sql"
                 ),
@@ -625,6 +676,8 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                 "column_name": "id",
                 "columns": {},
                 "config": test_config,
+                "group": None,
+                "contract": {"checksum": None, "enforced": False},
                 "sources": [],
                 "depends_on": {
                     "macros": ["macro.dbt.test_unique", "macro.dbt.get_where_subquery"],
@@ -642,7 +695,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                 "path": "unique_model_id.sql",
                 "raw_code": "{{ test_unique(**_dbt_generic_test_kwargs) }}",
                 "language": "sql",
-                "refs": [["model"]],
+                "refs": [{"name": "model", "package": None, "version": None}],
                 "relation_name": None,
                 "resource_type": "test",
                 "schema": test_audit_schema,
@@ -678,6 +731,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     }
                 },
                 "config": {
@@ -742,7 +796,10 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                 "owner": {"email": "something@example.com", "name": "Some name"},
                 "package_name": "test",
                 "path": "schema.yml",
-                "refs": [["model"], ["second_model"]],
+                "refs": [
+                    {"name": "model", "package": None, "version": None},
+                    {"name": "second_model", "package": None, "version": None},
+                ],
                 "resource_type": "exposure",
                 "sources": [],
                 "type": "notebook",
@@ -771,7 +828,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
                 },
                 "package_name": "test",
                 "path": "schema.yml",
-                "refs": [["model"]],
+                "refs": [{"name": "model", "package": None, "version": None}],
                 "resource_type": "exposure",
                 "sources": [["my_source", "my_table"]],
                 "type": "dashboard",
@@ -784,6 +841,7 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
             },
         },
         "metrics": {},
+        "groups": {},
         "selectors": {},
         "parent_map": {
             "model.test.model": ["seed.test.seed"],
@@ -822,12 +880,14 @@ def expected_seeded_manifest(project, model_database=None, quote_model=False):
             "test.test.test_nothing_model_.5d38568946": [],
             "test.test.unique_model_id.67b76558ff": [],
         },
+        "group_map": {},
         "docs": {
             "doc.dbt.__overview__": ANY,
             "doc.test.macro_info": ANY,
             "doc.test.macro_arg_info": ANY,
         },
         "disabled": {},
+        "semantic_models": {},
     }
 
 
@@ -860,11 +920,16 @@ def expected_references_manifest(project):
                 "columns": {},
                 "config": get_rendered_model_config(materialized="ephemeral"),
                 "sources": [["my_source", "my_table"]],
-                "depends_on": {"macros": [], "nodes": ["source.test.my_source.my_table"]},
+                "depends_on": {
+                    "macros": [],
+                    "nodes": ["source.test.my_source.my_table"],
+                },
+                "deprecation_date": None,
                 "deferred": False,
                 "description": "",
                 "docs": {"node_color": None, "show": True},
                 "fqn": ["test", "ephemeral_copy"],
+                "group": None,
                 "metrics": [],
                 "name": "ephemeral_copy",
                 "original_file_path": ephemeral_copy_path,
@@ -883,10 +948,15 @@ def expected_references_manifest(project):
                 "unique_id": "model.test.ephemeral_copy",
                 "compiled": True,
                 "compiled_code": ANY,
+                "contract": {"checksum": None, "enforced": False},
                 "extra_ctes_injected": True,
                 "extra_ctes": [],
                 "checksum": checksum_file(ephemeral_copy_path),
                 "unrendered_config": get_unrendered_model_config(materialized="ephemeral"),
+                "access": "protected",
+                "version": None,
+                "latest_version": None,
+                "constraints": [],
             },
             "model.test.ephemeral_summary": {
                 "alias": "ephemeral_summary",
@@ -901,6 +971,7 @@ def expected_references_manifest(project):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                     "ct": {
                         "description": "The number of instances of the first name",
@@ -909,15 +980,22 @@ def expected_references_manifest(project):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                 },
-                "config": get_rendered_model_config(materialized="table"),
+                "config": get_rendered_model_config(materialized="table", group="test_group"),
+                "contract": {"checksum": None, "enforced": False},
                 "sources": [],
-                "depends_on": {"macros": [], "nodes": ["model.test.ephemeral_copy"]},
+                "depends_on": {
+                    "macros": [],
+                    "nodes": ["model.test.ephemeral_copy"],
+                },
+                "deprecation_date": None,
                 "deferred": False,
                 "description": "A summmary table of the ephemeral copy of the seed data",
                 "docs": {"node_color": None, "show": True},
                 "fqn": ["test", "ephemeral_summary"],
+                "group": "test_group",
                 "metrics": [],
                 "name": "ephemeral_summary",
                 "original_file_path": ephemeral_summary_path,
@@ -926,7 +1004,7 @@ def expected_references_manifest(project):
                 "path": "ephemeral_summary.sql",
                 "raw_code": LineIndifferent(ephemeral_summary_sql),
                 "language": "sql",
-                "refs": [["ephemeral_copy"]],
+                "refs": [{"name": "ephemeral_copy", "package": None, "version": None}],
                 "relation_name": '"{0}"."{1}".ephemeral_summary'.format(
                     model_database, my_schema_name
                 ),
@@ -941,7 +1019,13 @@ def expected_references_manifest(project):
                 "extra_ctes_injected": True,
                 "extra_ctes": [ANY],
                 "checksum": checksum_file(ephemeral_summary_path),
-                "unrendered_config": get_unrendered_model_config(materialized="table"),
+                "unrendered_config": get_unrendered_model_config(
+                    materialized="table", group="test_group"
+                ),
+                "access": "protected",
+                "version": None,
+                "latest_version": None,
+                "constraints": [],
             },
             "model.test.view_summary": {
                 "alias": "view_summary",
@@ -956,6 +1040,7 @@ def expected_references_manifest(project):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                     "ct": {
                         "description": "The number of instances of the first name",
@@ -964,15 +1049,22 @@ def expected_references_manifest(project):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                 },
                 "config": get_rendered_model_config(),
+                "contract": {"checksum": None, "enforced": False},
                 "database": project.database,
-                "depends_on": {"macros": [], "nodes": ["model.test.ephemeral_summary"]},
+                "depends_on": {
+                    "macros": [],
+                    "nodes": ["model.test.ephemeral_summary"],
+                },
+                "deprecation_date": None,
                 "deferred": False,
                 "description": "A view of the summary of the ephemeral copy of the seed data",
                 "docs": {"node_color": None, "show": True},
                 "fqn": ["test", "view_summary"],
+                "group": None,
                 "metrics": [],
                 "name": "view_summary",
                 "original_file_path": view_summary_path,
@@ -981,7 +1073,7 @@ def expected_references_manifest(project):
                 "path": "view_summary.sql",
                 "raw_code": LineIndifferent(view_summary_sql),
                 "language": "sql",
-                "refs": [["ephemeral_summary"]],
+                "refs": [{"name": "ephemeral_summary", "package": None, "version": None}],
                 "relation_name": '"{0}"."{1}".view_summary'.format(model_database, my_schema_name),
                 "resource_type": "model",
                 "schema": my_schema_name,
@@ -995,6 +1087,10 @@ def expected_references_manifest(project):
                 "extra_ctes": [],
                 "checksum": checksum_file(view_summary_path),
                 "unrendered_config": get_unrendered_model_config(materialized="view"),
+                "access": "protected",
+                "version": None,
+                "latest_version": None,
+                "constraints": [],
             },
             "seed.test.seed": {
                 "alias": "seed",
@@ -1008,6 +1104,7 @@ def expected_references_manifest(project):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                     "first_name": {
                         "name": "first_name",
@@ -1016,6 +1113,7 @@ def expected_references_manifest(project):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                     "email": {
                         "name": "email",
@@ -1024,6 +1122,7 @@ def expected_references_manifest(project):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                     "ip_address": {
                         "name": "ip_address",
@@ -1032,6 +1131,7 @@ def expected_references_manifest(project):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                     "updated_at": {
                         "name": "updated_at",
@@ -1040,6 +1140,7 @@ def expected_references_manifest(project):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     },
                 },
                 "config": get_rendered_seed_config(),
@@ -1048,6 +1149,7 @@ def expected_references_manifest(project):
                 "description": "The test seed",
                 "docs": {"node_color": None, "show": True},
                 "fqn": ["test", "seed"],
+                "group": None,
                 "name": "seed",
                 "original_file_path": seed_path,
                 "package_name": "test",
@@ -1075,6 +1177,7 @@ def expected_references_manifest(project):
                 "compiled": True,
                 "compiled_code": ANY,
                 "config": get_rendered_snapshot_config(target_schema=alternate_schema),
+                "contract": {"checksum": None, "enforced": False},
                 "database": model_database,
                 "deferred": False,
                 "depends_on": {"macros": [], "nodes": ["seed.test.seed"]},
@@ -1083,6 +1186,7 @@ def expected_references_manifest(project):
                 "extra_ctes": [],
                 "extra_ctes_injected": True,
                 "fqn": ["test", "snapshot_seed", "snapshot_seed"],
+                "group": None,
                 "metrics": [],
                 "meta": {},
                 "name": "snapshot_seed",
@@ -1092,7 +1196,7 @@ def expected_references_manifest(project):
                 "path": "snapshot_seed.sql",
                 "raw_code": ANY,
                 "language": "sql",
-                "refs": [["seed"]],
+                "refs": [{"name": "seed", "package": None, "version": None}],
                 "relation_name": '"{0}"."{1}".snapshot_seed'.format(
                     model_database, alternate_schema
                 ),
@@ -1116,6 +1220,7 @@ def expected_references_manifest(project):
                         "meta": {},
                         "quote": None,
                         "tags": [],
+                        "constraints": [],
                     }
                 },
                 "config": {
@@ -1160,7 +1265,10 @@ def expected_references_manifest(project):
         "exposures": {
             "exposure.test.notebook_exposure": {
                 "created_at": ANY,
-                "depends_on": {"macros": [], "nodes": ["model.test.view_summary"]},
+                "depends_on": {
+                    "macros": [],
+                    "nodes": ["model.test.view_summary"],
+                },
                 "description": "A description of the complex exposure",
                 "label": None,
                 "config": {
@@ -1176,7 +1284,7 @@ def expected_references_manifest(project):
                 "owner": {"email": "something@example.com", "name": "Some name"},
                 "package_name": "test",
                 "path": "schema.yml",
-                "refs": [["view_summary"]],
+                "refs": [{"name": "view_summary", "package": None, "version": None}],
                 "resource_type": "exposure",
                 "sources": [],
                 "type": "notebook",
@@ -1186,6 +1294,17 @@ def expected_references_manifest(project):
             },
         },
         "metrics": {},
+        "groups": {
+            "group.test.test_group": {
+                "name": "test_group",
+                "resource_type": "group",
+                "original_file_path": os.path.join("models", "schema.yml"),
+                "owner": {"email": "test_group@test.com", "name": None},
+                "package_name": "test",
+                "path": "schema.yml",
+                "unique_id": "group.test.test_group",
+            }
+        },
         "selectors": {},
         "docs": {
             "doc.dbt.__overview__": ANY,
@@ -1298,6 +1417,7 @@ def expected_references_manifest(project):
             "snapshot.test.snapshot_seed": ["seed.test.seed"],
             "source.test.my_source.my_table": [],
         },
+        "group_map": {"test_group": ["model.test.ephemeral_summary"]},
         "disabled": {},
         "macros": {
             "macro.test.test_nothing": {
@@ -1326,4 +1446,484 @@ def expected_references_manifest(project):
                 ],
             }
         },
+        "semantic_models": {},
+    }
+
+
+def expected_versions_manifest(project):
+    model_database = project.database
+    my_schema_name = project.test_schema
+
+    versioned_model_v1_path = os.path.join("models", "arbitrary_file_name.sql")
+    versioned_model_v2_path = os.path.join("models", "versioned_model_v2.sql")
+    ref_versioned_model_path = os.path.join("models", "ref_versioned_model.sql")
+    compiled_model_path = os.path.join("target", "compiled", "test", "models")
+    schema_yml_path = os.path.join("models", "schema.yml")
+
+    versioned_model_v1_sql = read_file_replace_returns(versioned_model_v1_path).rstrip("\r\n")
+    versioned_model_v2_sql = read_file_replace_returns(versioned_model_v2_path).rstrip("\r\n")
+    ref_versioned_model_sql = read_file_replace_returns(ref_versioned_model_path).rstrip("\r\n")
+
+    test_config = get_rendered_tst_config()
+    unrendered_test_config = get_unrendered_tst_config()
+    test_audit_schema = my_schema_name + "_dbt_test__audit"
+    model_schema_yml_path = os.path.join("models", "schema.yml")
+
+    return {
+        "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v7.json",
+        "dbt_version": dbt.version.__version__,
+        "nodes": {
+            "model.test.versioned_model.v1": {
+                "alias": "versioned_model_v1",
+                "compiled_path": os.path.join(compiled_model_path, "arbitrary_file_name.sql"),
+                "build_path": None,
+                "created_at": ANY,
+                "columns": {
+                    "first_name": {
+                        "description": "The first name being summarized",
+                        "name": "first_name",
+                        "data_type": None,
+                        "meta": {},
+                        "quote": None,
+                        "tags": [],
+                        "constraints": [],
+                    },
+                    "ct": {
+                        "description": "The number of instances of the first name",
+                        "name": "ct",
+                        "data_type": None,
+                        "meta": {},
+                        "quote": None,
+                        "tags": [],
+                        "constraints": [],
+                    },
+                },
+                "config": get_rendered_model_config(
+                    materialized="table",
+                    group="test_group",
+                    meta={"size": "large", "color": "blue"},
+                ),
+                "constraints": [],
+                "sources": [],
+                "depends_on": {"macros": [], "nodes": []},
+                "deferred": False,
+                "description": "A versioned model",
+                "deprecation_date": ANY,
+                "docs": {"node_color": None, "show": True},
+                "fqn": ["test", "versioned_model", "v1"],
+                "group": "test_group",
+                "metrics": [],
+                "name": "versioned_model",
+                "original_file_path": versioned_model_v1_path,
+                "package_name": "test",
+                "patch_path": "test://" + os.path.join("models", "schema.yml"),
+                "path": "arbitrary_file_name.sql",
+                "raw_code": LineIndifferent(versioned_model_v1_sql),
+                "language": "sql",
+                "refs": [],
+                "relation_name": '"{0}"."{1}".versioned_model_v1'.format(
+                    model_database, my_schema_name
+                ),
+                "resource_type": "model",
+                "schema": my_schema_name,
+                "database": project.database,
+                "tags": [],
+                "meta": {"size": "large", "color": "blue"},
+                "unique_id": "model.test.versioned_model.v1",
+                "compiled": True,
+                "compiled_code": ANY,
+                "contract": {"checksum": None, "enforced": False},
+                "extra_ctes_injected": True,
+                "extra_ctes": [],
+                "checksum": checksum_file(versioned_model_v1_path),
+                "unrendered_config": get_unrendered_model_config(
+                    materialized="table",
+                    group="test_group",
+                    meta={"size": "large", "color": "blue"},
+                ),
+                "access": "protected",
+                "version": 1,
+                "latest_version": 2,
+            },
+            "model.test.versioned_model.v2": {
+                "alias": "versioned_model_v2",
+                "compiled_path": os.path.join(compiled_model_path, "versioned_model_v2.sql"),
+                "build_path": None,
+                "created_at": ANY,
+                "columns": {
+                    "first_name": {
+                        "description": "The first name being summarized",
+                        "name": "first_name",
+                        "data_type": None,
+                        "meta": {},
+                        "quote": None,
+                        "tags": [],
+                        "constraints": [],
+                    },
+                    "extra": {
+                        "description": "",
+                        "name": "extra",
+                        "data_type": None,
+                        "meta": {},
+                        "quote": None,
+                        "tags": [],
+                        "constraints": [],
+                    },
+                },
+                "config": get_rendered_model_config(
+                    materialized="view", group="test_group", meta={"size": "large", "color": "red"}
+                ),
+                "constraints": [],
+                "contract": {"checksum": None, "enforced": False},
+                "sources": [],
+                "depends_on": {"macros": [], "nodes": []},
+                "deferred": False,
+                "description": "A versioned model",
+                "deprecation_date": None,
+                "docs": {"node_color": None, "show": True},
+                "fqn": ["test", "versioned_model", "v2"],
+                "group": "test_group",
+                "metrics": [],
+                "name": "versioned_model",
+                "original_file_path": versioned_model_v2_path,
+                "package_name": "test",
+                "patch_path": "test://" + os.path.join("models", "schema.yml"),
+                "path": "versioned_model_v2.sql",
+                "raw_code": LineIndifferent(versioned_model_v2_sql),
+                "language": "sql",
+                "refs": [],
+                "relation_name": '"{0}"."{1}".versioned_model_v2'.format(
+                    model_database, my_schema_name
+                ),
+                "resource_type": "model",
+                "schema": my_schema_name,
+                "database": project.database,
+                "tags": [],
+                "meta": {"size": "large", "color": "red"},
+                "unique_id": "model.test.versioned_model.v2",
+                "compiled": True,
+                "compiled_code": ANY,
+                "extra_ctes_injected": True,
+                "extra_ctes": [],
+                "checksum": checksum_file(versioned_model_v2_path),
+                "unrendered_config": get_unrendered_model_config(
+                    materialized="view", group="test_group", meta={"size": "large", "color": "red"}
+                ),
+                "access": "protected",
+                "version": 2,
+                "latest_version": 2,
+            },
+            "model.test.ref_versioned_model": {
+                "alias": "ref_versioned_model",
+                "compiled_path": os.path.join(compiled_model_path, "ref_versioned_model.sql"),
+                "build_path": None,
+                "created_at": ANY,
+                "columns": {},
+                "config": get_rendered_model_config(),
+                "constraints": [],
+                "contract": {"checksum": None, "enforced": False},
+                "database": project.database,
+                "depends_on": {
+                    "macros": [],
+                    "nodes": [
+                        "model.test.versioned_model.v2",
+                        "model.test.versioned_model.v1",
+                    ],
+                },
+                "deprecation_date": None,
+                "deferred": False,
+                "description": "",
+                "docs": {"node_color": None, "show": True},
+                "fqn": ["test", "ref_versioned_model"],
+                "group": None,
+                "metrics": [],
+                "name": "ref_versioned_model",
+                "original_file_path": ref_versioned_model_path,
+                "package_name": "test",
+                "patch_path": "test://" + schema_yml_path,
+                "path": "ref_versioned_model.sql",
+                "raw_code": LineIndifferent(ref_versioned_model_sql),
+                "language": "sql",
+                "refs": [
+                    {"name": "versioned_model", "package": None, "version": 2},
+                    {"name": "versioned_model", "package": None, "version": "2"},
+                    {"name": "versioned_model", "package": None, "version": 2},
+                    {"name": "versioned_model", "package": None, "version": None},
+                    {"name": "versioned_model", "package": None, "version": 1},
+                ],
+                "relation_name": '"{0}"."{1}".ref_versioned_model'.format(
+                    model_database, my_schema_name
+                ),
+                "resource_type": "model",
+                "schema": my_schema_name,
+                "sources": [],
+                "tags": [],
+                "meta": {},
+                "unique_id": "model.test.ref_versioned_model",
+                "compiled": True,
+                "compiled_code": ANY,
+                "extra_ctes_injected": True,
+                "extra_ctes": [],
+                "checksum": checksum_file(ref_versioned_model_path),
+                "unrendered_config": get_unrendered_model_config(),
+                "access": "protected",
+                "version": None,
+                "latest_version": None,
+            },
+            "test.test.unique_versioned_model_v1_first_name.6138195dec": {
+                "alias": "unique_versioned_model_v1_first_name",
+                "attached_node": "model.test.versioned_model.v1",
+                "compiled_path": os.path.join(
+                    compiled_model_path, "schema.yml", "unique_versioned_model_v1_first_name.sql"
+                ),
+                "build_path": None,
+                "created_at": ANY,
+                "column_name": "first_name",
+                "columns": {},
+                "config": test_config,
+                "group": "test_group",
+                "contract": {"checksum": None, "enforced": False},
+                "sources": [],
+                "depends_on": {
+                    "macros": ["macro.dbt.test_unique", "macro.dbt.get_where_subquery"],
+                    "nodes": ["model.test.versioned_model.v1"],
+                },
+                "deferred": False,
+                "description": "",
+                "file_key_name": "models.versioned_model",
+                "fqn": ["test", "unique_versioned_model_v1_first_name"],
+                "metrics": [],
+                "name": "unique_versioned_model_v1_first_name",
+                "original_file_path": model_schema_yml_path,
+                "package_name": "test",
+                "patch_path": None,
+                "path": "unique_versioned_model_v1_first_name.sql",
+                "raw_code": "{{ test_unique(**_dbt_generic_test_kwargs) }}",
+                "language": "sql",
+                "refs": [{"name": "versioned_model", "package": None, "version": 1}],
+                "relation_name": None,
+                "resource_type": "test",
+                "schema": test_audit_schema,
+                "database": project.database,
+                "tags": [],
+                "meta": {},
+                "unique_id": "test.test.unique_versioned_model_v1_first_name.6138195dec",
+                "docs": {"node_color": None, "show": True},
+                "compiled": True,
+                "compiled_code": AnyStringWith("count(*)"),
+                "extra_ctes_injected": True,
+                "extra_ctes": [],
+                "test_metadata": {
+                    "namespace": None,
+                    "name": "unique",
+                    "kwargs": {
+                        "column_name": "first_name",
+                        "model": "{{ get_where_subquery(ref('versioned_model', version='1')) }}",
+                    },
+                },
+                "checksum": {"name": "none", "checksum": ""},
+                "unrendered_config": unrendered_test_config,
+            },
+            "test.test.unique_versioned_model_v1_count.0b4c0b688a": {
+                "alias": "unique_versioned_model_v1_count",
+                "attached_node": "model.test.versioned_model.v1",
+                "compiled_path": os.path.join(
+                    compiled_model_path, "schema.yml", "unique_versioned_model_v1_count.sql"
+                ),
+                "build_path": None,
+                "created_at": ANY,
+                "column_name": None,
+                "columns": {},
+                "config": test_config,
+                "group": "test_group",
+                "contract": {"checksum": None, "enforced": False},
+                "sources": [],
+                "depends_on": {
+                    "macros": ["macro.dbt.test_unique", "macro.dbt.get_where_subquery"],
+                    "nodes": ["model.test.versioned_model.v1"],
+                },
+                "deferred": False,
+                "description": "",
+                "file_key_name": "models.versioned_model",
+                "fqn": ["test", "unique_versioned_model_v1_count"],
+                "metrics": [],
+                "name": "unique_versioned_model_v1_count",
+                "original_file_path": model_schema_yml_path,
+                "package_name": "test",
+                "patch_path": None,
+                "path": "unique_versioned_model_v1_count.sql",
+                "raw_code": "{{ test_unique(**_dbt_generic_test_kwargs) }}",
+                "language": "sql",
+                "refs": [{"name": "versioned_model", "package": None, "version": 1}],
+                "relation_name": None,
+                "resource_type": "test",
+                "schema": test_audit_schema,
+                "database": project.database,
+                "tags": [],
+                "meta": {},
+                "unique_id": "test.test.unique_versioned_model_v1_count.0b4c0b688a",
+                "docs": {"node_color": None, "show": True},
+                "compiled": True,
+                "compiled_code": AnyStringWith("count(*)"),
+                "extra_ctes_injected": True,
+                "extra_ctes": [],
+                "test_metadata": {
+                    "namespace": None,
+                    "name": "unique",
+                    "kwargs": {
+                        "column_name": "count",
+                        "model": "{{ get_where_subquery(ref('versioned_model', version='1')) }}",
+                    },
+                },
+                "checksum": {"name": "none", "checksum": ""},
+                "unrendered_config": unrendered_test_config,
+            },
+            "test.test.unique_versioned_model_v2_first_name.998430d28e": {
+                "alias": "unique_versioned_model_v2_first_name",
+                "attached_node": "model.test.versioned_model.v2",
+                "compiled_path": os.path.join(
+                    compiled_model_path, "schema.yml", "unique_versioned_model_v2_first_name.sql"
+                ),
+                "build_path": None,
+                "created_at": ANY,
+                "column_name": "first_name",
+                "columns": {},
+                "config": test_config,
+                "group": "test_group",
+                "contract": {"checksum": None, "enforced": False},
+                "sources": [],
+                "depends_on": {
+                    "macros": ["macro.dbt.test_unique", "macro.dbt.get_where_subquery"],
+                    "nodes": ["model.test.versioned_model.v2"],
+                },
+                "deferred": False,
+                "description": "",
+                "file_key_name": "models.versioned_model",
+                "fqn": ["test", "unique_versioned_model_v2_first_name"],
+                "metrics": [],
+                "name": "unique_versioned_model_v2_first_name",
+                "original_file_path": model_schema_yml_path,
+                "package_name": "test",
+                "patch_path": None,
+                "path": "unique_versioned_model_v2_first_name.sql",
+                "raw_code": "{{ test_unique(**_dbt_generic_test_kwargs) }}",
+                "language": "sql",
+                "refs": [{"name": "versioned_model", "package": None, "version": 2}],
+                "relation_name": None,
+                "resource_type": "test",
+                "schema": test_audit_schema,
+                "database": project.database,
+                "tags": [],
+                "meta": {},
+                "unique_id": "test.test.unique_versioned_model_v2_first_name.998430d28e",
+                "docs": {"node_color": None, "show": True},
+                "compiled": True,
+                "compiled_code": AnyStringWith("count(*)"),
+                "extra_ctes_injected": True,
+                "extra_ctes": [],
+                "test_metadata": {
+                    "namespace": None,
+                    "name": "unique",
+                    "kwargs": {
+                        "column_name": "first_name",
+                        "model": "{{ get_where_subquery(ref('versioned_model', version='2')) }}",
+                    },
+                },
+                "checksum": {"name": "none", "checksum": ""},
+                "unrendered_config": unrendered_test_config,
+            },
+        },
+        "exposures": {
+            "exposure.test.notebook_exposure": {
+                "created_at": ANY,
+                "depends_on": {
+                    "macros": [],
+                    "nodes": ["model.test.versioned_model.v2"],
+                },
+                "description": "notebook_info",
+                "label": None,
+                "config": {
+                    "enabled": True,
+                },
+                "fqn": ["test", "notebook_exposure"],
+                "maturity": None,
+                "meta": {},
+                "metrics": [],
+                "tags": [],
+                "name": "notebook_exposure",
+                "original_file_path": os.path.join("models", "schema.yml"),
+                "owner": {"email": "something@example.com", "name": "Some name"},
+                "package_name": "test",
+                "path": "schema.yml",
+                "refs": [{"name": "versioned_model", "package": None, "version": 2}],
+                "resource_type": "exposure",
+                "sources": [],
+                "type": "notebook",
+                "unique_id": "exposure.test.notebook_exposure",
+                "url": None,
+                "unrendered_config": {},
+            },
+        },
+        "metrics": {},
+        "groups": {
+            "group.test.test_group": {
+                "name": "test_group",
+                "resource_type": "group",
+                "original_file_path": os.path.join("models", "schema.yml"),
+                "owner": {"email": "test_group@test.com", "name": None},
+                "package_name": "test",
+                "path": "schema.yml",
+                "unique_id": "group.test.test_group",
+            }
+        },
+        "sources": {},
+        "selectors": {},
+        "docs": {},
+        "child_map": {
+            "model.test.versioned_model.v1": [
+                "model.test.ref_versioned_model",
+                "test.test.unique_versioned_model_v1_count.0b4c0b688a",
+                "test.test.unique_versioned_model_v1_first_name.6138195dec",
+            ],
+            "model.test.versioned_model.v2": [
+                "exposure.test.notebook_exposure",
+                "model.test.ref_versioned_model",
+                "test.test.unique_versioned_model_v2_first_name.998430d28e",
+            ],
+            "model.test.ref_versioned_model": [],
+            "exposure.test.notebook_exposure": [],
+            "test.test.unique_versioned_model_v1_first_name.6138195dec": [],
+            "test.test.unique_versioned_model_v1_count.0b4c0b688a": [],
+            "test.test.unique_versioned_model_v2_first_name.998430d28e": [],
+        },
+        "parent_map": {
+            "model.test.versioned_model.v1": [],
+            "model.test.versioned_model.v2": [],
+            "model.test.ref_versioned_model": [
+                "model.test.versioned_model.v1",
+                "model.test.versioned_model.v2",
+            ],
+            "exposure.test.notebook_exposure": ["model.test.versioned_model.v2"],
+            "test.test.unique_versioned_model_v1_first_name.6138195dec": [
+                "model.test.versioned_model.v1"
+            ],
+            "test.test.unique_versioned_model_v1_count.0b4c0b688a": [
+                "model.test.versioned_model.v1"
+            ],
+            "test.test.unique_versioned_model_v2_first_name.998430d28e": [
+                "model.test.versioned_model.v2"
+            ],
+        },
+        "group_map": {
+            "test_group": [
+                "model.test.versioned_model.v1",
+                "model.test.versioned_model.v2",
+                "test.test.unique_versioned_model_v1_first_name.6138195dec",
+                "test.test.unique_versioned_model_v1_count.0b4c0b688a",
+                "test.test.unique_versioned_model_v2_first_name.998430d28e",
+            ]
+        },
+        "disabled": {},
+        "macros": {},
+        "semantic_models": {},
     }

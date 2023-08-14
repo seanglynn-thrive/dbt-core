@@ -1,61 +1,121 @@
 from copy import copy
-from typing import List, Tuple, Optional
+from dataclasses import dataclass
+from typing import Callable, List, Optional, Union
 
 import click
+from click.exceptions import (
+    Exit as ClickExit,
+    BadOptionUsage,
+    NoSuchOption,
+    UsageError,
+)
+
 from dbt.cli import requires, params as p
-from dbt.config.project import Project
-from dbt.config.profile import Profile
+from dbt.cli.exceptions import (
+    DbtInternalException,
+    DbtUsageException,
+)
 from dbt.contracts.graph.manifest import Manifest
-from dbt.task.clean import CleanTask
-from dbt.task.compile import CompileTask
-from dbt.task.deps import AddTask, DepsTask, LockTask
-from dbt.task.debug import DebugTask
-from dbt.task.run import RunTask
-from dbt.task.serve import ServeTask
-from dbt.task.test import TestTask
-from dbt.task.snapshot import SnapshotTask
-from dbt.task.seed import SeedTask
-from dbt.task.list import ListTask
-from dbt.task.freshness import FreshnessTask
-from dbt.task.run_operation import RunOperationTask
+from dbt.contracts.results import (
+    CatalogArtifact,
+    RunExecutionResult,
+)
+from dbt.events.base_types import EventMsg
 from dbt.task.build import BuildTask
+from dbt.task.clean import CleanTask
+from dbt.task.clone import CloneTask
+from dbt.task.compile import CompileTask
+from dbt.task.debug import DebugTask
+from dbt.task.deps import DepsTask, LockTask, AddTask
+from dbt.task.freshness import FreshnessTask
 from dbt.task.generate import GenerateTask
 from dbt.task.init import InitTask
+from dbt.task.list import ListTask
+from dbt.task.retry import RetryTask
+from dbt.task.run import RunTask
+from dbt.task.run_operation import RunOperationTask
+from dbt.task.seed import SeedTask
+from dbt.task.serve import ServeTask
+from dbt.task.show import ShowTask
+from dbt.task.snapshot import SnapshotTask
+from dbt.task.test import TestTask
 
 
-class dbtUsageException(Exception):
-    pass
+@dataclass
+class dbtRunnerResult:
+    """Contains the result of an invocation of the dbtRunner"""
 
+    success: bool
 
-class dbtInternalException(Exception):
-    pass
+    exception: Optional[BaseException] = None
+    result: Union[
+        bool,  # debug
+        CatalogArtifact,  # docs generate
+        List[str],  # list/ls
+        Manifest,  # parse
+        None,  # clean, deps, init, source
+        RunExecutionResult,  # build, compile, run, seed, snapshot, test, run-operation
+    ] = None
 
 
 # Programmatic invocation
 class dbtRunner:
     def __init__(
-        self, project: Project = None, profile: Profile = None, manifest: Manifest = None
+        self,
+        manifest: Optional[Manifest] = None,
+        callbacks: Optional[List[Callable[[EventMsg], None]]] = None,
     ):
-        self.project = project
-        self.profile = profile
         self.manifest = manifest
 
-    def invoke(self, args: List[str]) -> Tuple[Optional[List], bool]:
+        if callbacks is None:
+            callbacks = []
+        self.callbacks = callbacks
+
+    def invoke(self, args: List[str], **kwargs) -> dbtRunnerResult:
         try:
             dbt_ctx = cli.make_context(cli.name, args)
             dbt_ctx.obj = {
-                "project": self.project,
-                "profile": self.profile,
                 "manifest": self.manifest,
+                "callbacks": self.callbacks,
             }
-            return cli.invoke(dbt_ctx)
-        except click.exceptions.Exit as e:
-            # 0 exit code, expected for --version early exit
-            if str(e) == "0":
-                return [], True
-            raise dbtInternalException(f"unhandled exit code {str(e)}")
-        except (click.NoSuchOption, click.UsageError) as e:
-            raise dbtUsageException(e.message)
+
+            for key, value in kwargs.items():
+                dbt_ctx.params[key] = value
+                # Hack to set parameter source to custom string
+                dbt_ctx.set_parameter_source(key, "kwargs")  # type: ignore
+
+            result, success = cli.invoke(dbt_ctx)
+            return dbtRunnerResult(
+                result=result,
+                success=success,
+            )
+        except requires.ResultExit as e:
+            return dbtRunnerResult(
+                result=e.result,
+                success=False,
+            )
+        except requires.ExceptionExit as e:
+            return dbtRunnerResult(
+                exception=e.exception,
+                success=False,
+            )
+        except (BadOptionUsage, NoSuchOption, UsageError) as e:
+            return dbtRunnerResult(
+                exception=DbtUsageException(e.message),
+                success=False,
+            )
+        except ClickExit as e:
+            if e.exit_code == 0:
+                return dbtRunnerResult(success=True)
+            return dbtRunnerResult(
+                exception=DbtInternalException(f"unhandled exit code {e.exit_code}"),
+                success=False,
+            )
+        except BaseException as e:
+            return dbtRunnerResult(
+                exception=e,
+                success=False,
+            )
 
 
 # dbt
@@ -66,23 +126,31 @@ class dbtRunner:
     epilog="Specify one of these sub-commands and you can find more help from there.",
 )
 @click.pass_context
-@p.send_anonymous_usage_stats
 @p.cache_selected_only
 @p.debug
+@p.deprecated_print
 @p.enable_legacy_logger
 @p.fail_fast
 @p.log_cache_events
+@p.log_file_max_bytes
 @p.log_format
+@p.log_format_file
+@p.log_level
+@p.log_level_file
 @p.log_path
 @p.macro_debugging
 @p.partial_parse
+@p.partial_parse_file_path
+@p.populate_cache
 @p.print
 @p.printer_width
 @p.quiet
 @p.record_timing_info
+@p.send_anonymous_usage_stats
 @p.single_threaded
 @p.static_parser
 @p.use_colors
+@p.use_colors_file
 @p.use_experimental_parser
 @p.version
 @p.version_check
@@ -99,9 +167,11 @@ def cli(ctx, **kwargs):
 @cli.command("build")
 @click.pass_context
 @p.defer
+@p.deprecated_defer
 @p.exclude
 @p.fail_fast
 @p.favor_state
+@p.deprecated_favor_state
 @p.full_refresh
 @p.indirect_selection
 @p.profile
@@ -112,19 +182,22 @@ def cli(ctx, **kwargs):
 @p.selector
 @p.show
 @p.state
+@p.defer_state
+@p.deprecated_state
 @p.store_failures
 @p.target
 @p.target_path
 @p.threads
 @p.vars
 @p.version_check
+@requires.postflight
 @requires.preflight
 @requires.profile
 @requires.project
 @requires.runtime_config
 @requires.manifest
 def build(ctx, **kwargs):
-    """Run all Seeds, Models, Snapshots, and tests in DAG order"""
+    """Run all seeds, models, snapshots, and tests in DAG order"""
     task = BuildTask(
         ctx.obj["flags"],
         ctx.obj["runtime_config"],
@@ -143,7 +216,9 @@ def build(ctx, **kwargs):
 @p.profiles_dir
 @p.project_dir
 @p.target
+@p.target_path
 @p.vars
+@requires.postflight
 @requires.preflight
 @requires.unset_profile
 @requires.project
@@ -168,19 +243,25 @@ def docs(ctx, **kwargs):
 @click.pass_context
 @p.compile_docs
 @p.defer
+@p.deprecated_defer
 @p.exclude
 @p.favor_state
+@p.deprecated_favor_state
 @p.profile
 @p.profiles_dir
 @p.project_dir
 @p.select
 @p.selector
+@p.empty_catalog
 @p.state
+@p.defer_state
+@p.deprecated_state
 @p.target
 @p.target_path
 @p.threads
 @p.vars
 @p.version_check
+@requires.postflight
 @requires.preflight
 @requires.profile
 @requires.project
@@ -208,18 +289,18 @@ def docs_generate(ctx, **kwargs):
 @p.profiles_dir
 @p.project_dir
 @p.target
+@p.target_path
 @p.vars
+@requires.postflight
 @requires.preflight
 @requires.profile
 @requires.project
 @requires.runtime_config
-@requires.manifest
 def docs_serve(ctx, **kwargs):
     """Serve the documentation website for your project"""
     task = ServeTask(
         ctx.obj["flags"],
         ctx.obj["runtime_config"],
-        ctx.obj["manifest"],
     )
 
     results = task.run()
@@ -231,21 +312,29 @@ def docs_serve(ctx, **kwargs):
 @cli.command("compile")
 @click.pass_context
 @p.defer
+@p.deprecated_defer
 @p.exclude
 @p.favor_state
+@p.deprecated_favor_state
 @p.full_refresh
-@p.parse_only
+@p.show_output_format
+@p.indirect_selection
+@p.introspect
 @p.profile
 @p.profiles_dir
 @p.project_dir
 @p.select
 @p.selector
+@p.inline
 @p.state
+@p.defer_state
+@p.deprecated_state
 @p.target
 @p.target_path
 @p.threads
 @p.vars
 @p.version_check
+@requires.postflight
 @requires.preflight
 @requires.profile
 @requires.project
@@ -265,9 +354,57 @@ def compile(ctx, **kwargs):
     return results, success
 
 
+# dbt show
+@cli.command("show")
+@click.pass_context
+@p.defer
+@p.deprecated_defer
+@p.exclude
+@p.favor_state
+@p.deprecated_favor_state
+@p.full_refresh
+@p.show_output_format
+@p.show_limit
+@p.indirect_selection
+@p.introspect
+@p.profile
+@p.profiles_dir
+@p.project_dir
+@p.select
+@p.selector
+@p.inline
+@p.state
+@p.defer_state
+@p.deprecated_state
+@p.target
+@p.target_path
+@p.threads
+@p.vars
+@p.version_check
+@requires.postflight
+@requires.preflight
+@requires.profile
+@requires.project
+@requires.runtime_config
+@requires.manifest
+def show(ctx, **kwargs):
+    """Generates executable SQL for a named resource or inline query, runs that SQL, and returns a preview of the
+    results. Does not materialize anything to the warehouse."""
+    task = ShowTask(
+        ctx.obj["flags"],
+        ctx.obj["runtime_config"],
+        ctx.obj["manifest"],
+    )
+
+    results = task.run()
+    success = task.interpret_results(results)
+    return results, success
+
+
 # dbt debug
 @cli.command("debug")
 @click.pass_context
+@p.debug_connection
 @p.config_dir
 @p.profile
 @p.profiles_dir_exists_false
@@ -275,9 +412,11 @@ def compile(ctx, **kwargs):
 @p.target
 @p.vars
 @p.version_check
+@requires.postflight
 @requires.preflight
 def debug(ctx, **kwargs):
-    """Show some helpful information about dbt for debugging. Not to be confused with the --debug option which increases verbosity."""
+    """Show information on the current dbt environment and check dependencies, then test the database connection. Not to be confused with the --debug option which increases verbosity."""
+
     task = DebugTask(
         ctx.obj["flags"],
         None,
@@ -298,10 +437,11 @@ def deps(ctx, **kwargs):
 @deps.command("install")
 @click.pass_context
 @p.profile
-@p.profiles_dir
+@p.profiles_dir_exists_false
 @p.project_dir
 @p.target
 @p.vars
+@requires.postflight
 @requires.preflight
 @requires.unset_profile
 @requires.project
@@ -361,11 +501,12 @@ def deps_add(ctx, **kwargs):
 # for backwards compatibility, accept 'project_name' as an optional positional argument
 @click.argument("project_name", required=False)
 @p.profile
-@p.profiles_dir
+@p.profiles_dir_exists_false
 @p.project_dir
 @p.skip_profile_setup
 @p.target
 @p.vars
+@requires.postflight
 @requires.preflight
 def init(ctx, **kwargs):
     """Initialize a new dbt project."""
@@ -391,8 +532,12 @@ def init(ctx, **kwargs):
 @p.raw_select
 @p.selector
 @p.state
+@p.defer_state
+@p.deprecated_state
 @p.target
+@p.target_path
 @p.vars
+@requires.postflight
 @requires.preflight
 @requires.profile
 @requires.project
@@ -420,7 +565,6 @@ cli.add_command(ls, "ls")
 # dbt parse
 @cli.command("parse")
 @click.pass_context
-@p.compile_parse
 @p.profile
 @p.profiles_dir
 @p.project_dir
@@ -429,7 +573,7 @@ cli.add_command(ls, "ls")
 @p.threads
 @p.vars
 @p.version_check
-@p.write_manifest
+@requires.postflight
 @requires.preflight
 @requires.profile
 @requires.project
@@ -438,14 +582,16 @@ cli.add_command(ls, "ls")
 def parse(ctx, **kwargs):
     """Parses the project and provides information on performance"""
     # manifest generation and writing happens in @requires.manifest
-    return None, True
+    return ctx.obj["manifest"], True
 
 
 # dbt run
 @cli.command("run")
 @click.pass_context
 @p.defer
+@p.deprecated_defer
 @p.favor_state
+@p.deprecated_favor_state
 @p.exclude
 @p.fail_fast
 @p.full_refresh
@@ -455,6 +601,75 @@ def parse(ctx, **kwargs):
 @p.select
 @p.selector
 @p.state
+@p.defer_state
+@p.deprecated_state
+@p.target
+@p.target_path
+@p.threads
+@p.vars
+@p.version_check
+@requires.postflight
+@requires.preflight
+@requires.profile
+@requires.project
+@requires.runtime_config
+@requires.manifest
+def run(ctx, **kwargs):
+    """Compile SQL and execute against the current target database."""
+    task = RunTask(
+        ctx.obj["flags"],
+        ctx.obj["runtime_config"],
+        ctx.obj["manifest"],
+    )
+
+    results = task.run()
+    success = task.interpret_results(results)
+    return results, success
+
+
+# dbt retry
+@cli.command("retry")
+@click.pass_context
+@p.project_dir
+@p.profiles_dir
+@p.vars
+@p.profile
+@p.target
+@p.state
+@p.threads
+@p.fail_fast
+@requires.postflight
+@requires.preflight
+@requires.profile
+@requires.project
+@requires.runtime_config
+@requires.manifest
+def retry(ctx, **kwargs):
+    """Retry the nodes that failed in the previous run."""
+    task = RetryTask(
+        ctx.obj["flags"],
+        ctx.obj["runtime_config"],
+        ctx.obj["manifest"],
+    )
+
+    results = task.run()
+    success = task.interpret_results(results)
+    return results, success
+
+
+# dbt clone
+@cli.command("clone")
+@click.pass_context
+@p.defer_state
+@p.exclude
+@p.full_refresh
+@p.profile
+@p.profiles_dir
+@p.project_dir
+@p.resource_type
+@p.select
+@p.selector
+@p.state  # required
 @p.target
 @p.target_path
 @p.threads
@@ -465,9 +680,10 @@ def parse(ctx, **kwargs):
 @requires.project
 @requires.runtime_config
 @requires.manifest
-def run(ctx, **kwargs):
-    """Compile SQL and execute against the current target database."""
-    task = RunTask(
+@requires.postflight
+def clone(ctx, **kwargs):
+    """Create clones of selected nodes based on their location in the manifest provided to --state."""
+    task = CloneTask(
         ctx.obj["flags"],
         ctx.obj["runtime_config"],
         ctx.obj["manifest"],
@@ -487,7 +703,10 @@ def run(ctx, **kwargs):
 @p.profiles_dir
 @p.project_dir
 @p.target
+@p.target_path
+@p.threads
 @p.vars
+@requires.postflight
 @requires.preflight
 @requires.profile
 @requires.project
@@ -518,11 +737,14 @@ def run_operation(ctx, **kwargs):
 @p.selector
 @p.show
 @p.state
+@p.defer_state
+@p.deprecated_state
 @p.target
 @p.target_path
 @p.threads
 @p.vars
 @p.version_check
+@requires.postflight
 @requires.preflight
 @requires.profile
 @requires.project
@@ -544,17 +766,23 @@ def seed(ctx, **kwargs):
 @cli.command("snapshot")
 @click.pass_context
 @p.defer
+@p.deprecated_defer
 @p.exclude
 @p.favor_state
+@p.deprecated_favor_state
 @p.profile
 @p.profiles_dir
 @p.project_dir
 @p.select
 @p.selector
 @p.state
+@p.defer_state
+@p.deprecated_state
 @p.target
+@p.target_path
 @p.threads
 @p.vars
+@requires.postflight
 @requires.preflight
 @requires.profile
 @requires.project
@@ -591,9 +819,13 @@ def source(ctx, **kwargs):
 @p.select
 @p.selector
 @p.state
+@p.defer_state
+@p.deprecated_state
 @p.target
+@p.target_path
 @p.threads
 @p.vars
+@requires.postflight
 @requires.preflight
 @requires.profile
 @requires.project
@@ -622,9 +854,11 @@ cli.commands["source"].add_command(snapshot_freshness, "snapshot-freshness")  # 
 @cli.command("test")
 @click.pass_context
 @p.defer
+@p.deprecated_defer
 @p.exclude
 @p.fail_fast
 @p.favor_state
+@p.deprecated_favor_state
 @p.indirect_selection
 @p.profile
 @p.profiles_dir
@@ -632,12 +866,15 @@ cli.commands["source"].add_command(snapshot_freshness, "snapshot-freshness")  # 
 @p.select
 @p.selector
 @p.state
+@p.defer_state
+@p.deprecated_state
 @p.store_failures
 @p.target
 @p.target_path
 @p.threads
 @p.vars
 @p.version_check
+@requires.postflight
 @requires.preflight
 @requires.profile
 @requires.project

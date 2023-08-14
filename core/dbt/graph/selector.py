@@ -36,16 +36,18 @@ def can_select_indirectly(node):
 
 
 class NodeSelector(MethodManager):
-    """The node selector is aware of the graph and manifest,"""
+    """The node selector is aware of the graph and manifest"""
 
     def __init__(
         self,
         graph: Graph,
         manifest: Manifest,
         previous_state: Optional[PreviousState] = None,
+        include_empty_nodes: bool = False,
     ):
         super().__init__(manifest, previous_state)
         self.full_graph = graph
+        self.include_empty_nodes = include_empty_nodes
 
         # build a subgraph containing only non-empty, enabled nodes and enabled
         # sources.
@@ -87,11 +89,14 @@ class NodeSelector(MethodManager):
             )
             return set(), set()
 
-        neighbors = self.collect_specified_neighbors(spec, collected)
-        direct_nodes, indirect_nodes = self.expand_selection(
-            selected=(collected | neighbors), indirect_selection=spec.indirect_selection
-        )
-        return direct_nodes, indirect_nodes
+        if spec.indirect_selection == IndirectSelection.Empty:
+            return collected, set()
+        else:
+            neighbors = self.collect_specified_neighbors(spec, collected)
+            direct_nodes, indirect_nodes = self.expand_selection(
+                selected=(collected | neighbors), indirect_selection=spec.indirect_selection
+            )
+            return direct_nodes, indirect_nodes
 
     def collect_specified_neighbors(
         self, spec: SelectionCriteria, selected: Set[UniqueId]
@@ -163,8 +168,14 @@ class NodeSelector(MethodManager):
         elif unique_id in self.manifest.metrics:
             metric = self.manifest.metrics[unique_id]
             return metric.config.enabled
+        elif unique_id in self.manifest.semantic_models:
+            return True
         node = self.manifest.nodes[unique_id]
-        return not node.empty and node.config.enabled
+
+        if self.include_empty_nodes:
+            return node.config.enabled
+        else:
+            return not node.empty and node.config.enabled
 
     def node_is_match(self, node: GraphMemberNode) -> bool:
         """Determine if a node is a match for the selector. Non-match nodes
@@ -182,6 +193,8 @@ class NodeSelector(MethodManager):
             node = self.manifest.exposures[unique_id]
         elif unique_id in self.manifest.metrics:
             node = self.manifest.metrics[unique_id]
+        elif unique_id in self.manifest.semantic_models:
+            node = self.manifest.semantic_models[unique_id]
         else:
             raise DbtInternalError(f"Node {unique_id} not found in the manifest!")
         return self.node_is_match(node)
@@ -199,7 +212,7 @@ class NodeSelector(MethodManager):
     ) -> Tuple[Set[UniqueId], Set[UniqueId]]:
         # Test selection by default expands to include an implicitly/indirectly selected tests.
         # `dbt test -m model_a` also includes tests that directly depend on `model_a`.
-        # Expansion has three modes, EAGER, CAUTIOUS and BUILDABLE.
+        # Expansion has four modes, EAGER, CAUTIOUS and BUILDABLE, EMPTY.
         #
         # EAGER mode: If ANY parent is selected, select the test.
         #
@@ -212,6 +225,8 @@ class NodeSelector(MethodManager):
         #  - If ALL parents are selected, or the parents of the test are themselves parents of the selected, select the test.
         #  - If ANY parent is missing, return it separately. We'll keep it around
         #    for later and see if its other parents show up.
+        #
+        # EMPTY mode: Only select the given node and ignore attached nodes (i.e. ignore tests attached to a model)
         #
         # Users can opt out of inclusive EAGER mode by passing --indirect-selection cautious
         # CLI argument or by specifying `indirect_selection: true` in a yaml selector
@@ -237,6 +252,8 @@ class NodeSelector(MethodManager):
                         node.depends_on_nodes
                     ) <= set(selected_and_parents):
                         direct_nodes.add(unique_id)
+                    elif indirect_selection == IndirectSelection.Empty:
+                        pass
                     else:
                         indirect_nodes.add(unique_id)
 
@@ -306,11 +323,13 @@ class ResourceTypeSelector(NodeSelector):
         manifest: Manifest,
         previous_state: Optional[PreviousState],
         resource_types: List[NodeType],
+        include_empty_nodes: bool = False,
     ):
         super().__init__(
             graph=graph,
             manifest=manifest,
             previous_state=previous_state,
+            include_empty_nodes=include_empty_nodes,
         )
         self.resource_types: Set[NodeType] = set(resource_types)
 

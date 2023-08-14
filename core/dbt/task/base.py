@@ -3,11 +3,15 @@ import threading
 import time
 import traceback
 from abc import ABCMeta, abstractmethod
-from typing import Type, Union, Dict, Any, Optional
+from contextlib import nullcontext
 from datetime import datetime
+from typing import Type, Union, Dict, Any, Optional
 
+import dbt.exceptions
 from dbt import tracking
-from dbt import flags
+from dbt.adapters.factory import get_adapter
+from dbt.config import RuntimeConfig, Project
+from dbt.config.profile import read_profile
 from dbt.contracts.graph.manifest import Manifest
 from dbt.contracts.results import (
     NodeStatus,
@@ -16,13 +20,7 @@ from dbt.contracts.results import (
     RunStatus,
     RunningStatus,
 )
-from dbt.exceptions import (
-    NotImplementedError,
-    CompilationError,
-    DbtRuntimeError,
-    DbtInternalError,
-)
-from dbt.logger import log_manager
+from dbt.events.contextvars import get_node_info
 from dbt.events.functions import fire_event
 from dbt.events.types import (
     LogDbtProjectError,
@@ -37,14 +35,16 @@ from dbt.events.types import (
     NodeCompiling,
     NodeExecuting,
 )
-from dbt.events.contextvars import get_node_info
-from .printer import print_run_result_error
-
-from dbt.adapters.factory import get_adapter
-from dbt.config import RuntimeConfig, Project
-from dbt.config.profile import read_profile
-import dbt.exceptions
+from dbt.exceptions import (
+    NotImplementedError,
+    CompilationError,
+    DbtRuntimeError,
+    DbtInternalError,
+)
+from dbt.flags import get_flags
 from dbt.graph import Graph
+from dbt.logger import log_manager
+from .printer import print_run_result_error
 
 
 class NoneConfig:
@@ -56,7 +56,7 @@ class NoneConfig:
 def read_profiles(profiles_dir=None):
     """This is only used for some error handling"""
     if profiles_dir is None:
-        profiles_dir = flags.PROFILES_DIR
+        profiles_dir = get_flags().PROFILES_DIR
 
     raw_profiles = read_profile(profiles_dir)
 
@@ -86,7 +86,7 @@ class BaseTask(metaclass=ABCMeta):
 
     @classmethod
     def set_log_format(cls):
-        if flags.LOG_FORMAT == "json":
+        if get_flags().LOG_FORMAT == "json":
             log_manager.format_json()
         else:
             log_manager.format_text()
@@ -102,7 +102,7 @@ class BaseTask(metaclass=ABCMeta):
             tracking.track_invalid_invocation(args=args, result_type=exc.result_type)
             raise dbt.exceptions.DbtRuntimeError("Could not run dbt") from exc
         except dbt.exceptions.DbtProfileError as exc:
-            all_profile_names = list(read_profiles(flags.PROFILES_DIR).keys())
+            all_profile_names = list(read_profiles(get_flags().PROFILES_DIR).keys())
             fire_event(LogDbtProfileError(exc=str(exc), profiles=all_profile_names))
             tracking.track_invalid_invocation(args=args, result_type=exc.result_type)
             raise dbt.exceptions.DbtRuntimeError("Could not run dbt") from exc
@@ -203,6 +203,8 @@ class BaseRunner(metaclass=ABCMeta):
         self.skip = False
         self.skip_cause: Optional[RunResult] = None
 
+        self.run_ephemeral_models = False
+
     @abstractmethod
     def compile(self, manifest: Manifest) -> Any:
         pass
@@ -294,48 +296,32 @@ class BaseRunner(metaclass=ABCMeta):
             failures=result.failures,
         )
 
-    def skip_result(self, node, message):
-        thread_id = threading.current_thread().name
-        return RunResult(
-            status=RunStatus.Skipped,
-            thread_id=thread_id,
-            execution_time=0,
-            timing=[],
-            message=message,
-            node=node,
-            adapter_response={},
-            failures=None,
-        )
-
     def compile_and_execute(self, manifest, ctx):
         result = None
-        with self.adapter.connection_for(self.node):
+        with self.adapter.connection_for(self.node) if get_flags().INTROSPECT else nullcontext():
             ctx.node.update_event_status(node_status=RunningStatus.Compiling)
             fire_event(
                 NodeCompiling(
                     node_info=ctx.node.node_info,
                 )
             )
-            with collect_timing_info("compile") as timing_info:
+            with collect_timing_info("compile", ctx.timing.append):
                 # if we fail here, we still have a compiled node to return
                 # this has the benefit of showing a build path for the errant
                 # model
                 ctx.node = self.compile(manifest)
-            ctx.timing.append(timing_info)
 
             # for ephemeral nodes, we only want to compile, not run
-            if not ctx.node.is_ephemeral_model:
+            if not ctx.node.is_ephemeral_model or self.run_ephemeral_models:
                 ctx.node.update_event_status(node_status=RunningStatus.Executing)
                 fire_event(
                     NodeExecuting(
                         node_info=ctx.node.node_info,
                     )
                 )
-                with collect_timing_info("execute") as timing_info:
+                with collect_timing_info("execute", ctx.timing.append):
                     result = self.run(ctx.node, manifest)
                     ctx.node = result.node
-
-                ctx.timing.append(timing_info)
 
         return result
 
@@ -400,8 +386,7 @@ class BaseRunner(metaclass=ABCMeta):
                 error = exc_str
 
         if error is not None:
-            # we could include compile time for runtime errors here
-            result = self.error_result(ctx.node, error, started, [])
+            result = self.error_result(ctx.node, error, started, ctx.timing)
         elif result is not None:
             result = self.from_run_result(result, started, ctx.timing)
         else:
@@ -485,7 +470,7 @@ class BaseRunner(metaclass=ABCMeta):
                     )
                 )
 
-        node_result = self.skip_result(self.node, error_message)
+        node_result = RunResult.from_node(self.node, RunStatus.Skipped, error_message)
         return node_result
 
     def do_skip(self, cause=None):

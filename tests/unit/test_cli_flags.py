@@ -2,17 +2,24 @@ import pytest
 
 import click
 from multiprocessing import get_context
-from typing import List
+from pathlib import Path
+from typing import List, Optional
 
-from dbt.cli.main import cli
-from dbt.contracts.project import UserConfig
+from dbt.cli.exceptions import DbtUsageException
 from dbt.cli.flags import Flags
+from dbt.cli.main import cli
+from dbt.cli.types import Command
+from dbt.contracts.project import UserConfig
+from dbt.exceptions import DbtInternalError
 from dbt.helper_types import WarnErrorOptions
+from dbt.tests.util import rm_file, write_file
 
 
 class TestFlags:
-    def make_dbt_context(self, context_name: str, args: List[str]) -> click.Context:
-        ctx = cli.make_context(context_name, args)
+    def make_dbt_context(
+        self, context_name: str, args: List[str], parent: Optional[click.Context] = None
+    ) -> click.Context:
+        ctx = cli.make_context(context_name, args, parent)
         return ctx
 
     @pytest.fixture(scope="class")
@@ -34,15 +41,26 @@ class TestFlags:
     @pytest.mark.parametrize("param", cli.params)
     def test_cli_group_flags_from_params(self, run_context, param):
         flags = Flags(run_context)
+
+        if "DEPRECATED_" in param.name.upper():
+            assert not hasattr(flags, param.name.upper())
+            return
+
         if param.name.upper() in ("VERSION", "LOG_PATH"):
             return
+
         assert hasattr(flags, param.name.upper())
         assert getattr(flags, param.name.upper()) == run_context.params[param.name.lower()]
 
     def test_log_path_default(self, run_context):
         flags = Flags(run_context)
         assert hasattr(flags, "LOG_PATH")
-        assert getattr(flags, "LOG_PATH") == "logs"
+        assert getattr(flags, "LOG_PATH") == Path("logs")
+
+    def test_log_file_max_size_default(self, run_context):
+        flags = Flags(run_context)
+        assert hasattr(flags, "LOG_FILE_MAX_BYTES")
+        assert getattr(flags, "LOG_FILE_MAX_BYTES") == 10 * 1024 * 1024
 
     @pytest.mark.parametrize(
         "set_stats_param,do_not_track,expected_anonymous_usage_stats",
@@ -141,7 +159,7 @@ class TestFlags:
             "run", ["--warn-error", "--warn-error-options", '{"include": "all"}', "run"]
         )
 
-        with pytest.raises(click.BadOptionUsage):
+        with pytest.raises(DbtUsageException):
             Flags(context)
 
     @pytest.mark.parametrize("warn_error", [True, False])
@@ -151,7 +169,7 @@ class TestFlags:
             "run", ["--warn-error-options", '{"include": "all"}', "run"]
         )
 
-        with pytest.raises(click.BadOptionUsage):
+        with pytest.raises(DbtUsageException):
             Flags(context, user_config)
 
     @pytest.mark.parametrize("warn_error", ["True", "False"])
@@ -160,7 +178,7 @@ class TestFlags:
         monkeypatch.setenv("DBT_WARN_ERROR_OPTIONS", '{"include":"all"}')
         context = self.make_dbt_context("run", ["run"])
 
-        with pytest.raises(click.BadOptionUsage):
+        with pytest.raises(DbtUsageException):
             Flags(context)
 
     @pytest.mark.parametrize("warn_error", [True, False])
@@ -170,7 +188,7 @@ class TestFlags:
             "run", ["--warn-error-options", '{"include": "all"}', "run"]
         )
 
-        with pytest.raises(click.BadOptionUsage):
+        with pytest.raises(DbtUsageException):
             Flags(context, user_config)
 
     @pytest.mark.parametrize("warn_error", ["True", "False"])
@@ -180,7 +198,7 @@ class TestFlags:
             "run", ["--warn-error-options", '{"include": "all"}', "run"]
         )
 
-        with pytest.raises(click.BadOptionUsage):
+        with pytest.raises(DbtUsageException):
             Flags(context)
 
     @pytest.mark.parametrize("warn_error", ["True", "False"])
@@ -191,5 +209,190 @@ class TestFlags:
         monkeypatch.setenv("DBT_WARN_ERROR_OPTIONS", '{"include": "all"}')
         context = self.make_dbt_context("run", ["run"])
 
-        with pytest.raises(click.BadOptionUsage):
+        with pytest.raises(DbtUsageException):
             Flags(context, user_config)
+
+    @pytest.mark.parametrize(
+        "cli_colors,cli_colors_file,flag_colors,flag_colors_file",
+        [
+            (None, None, True, True),
+            (True, None, True, True),
+            (None, True, True, True),
+            (False, None, False, False),
+            (None, False, True, False),
+            (True, True, True, True),
+            (False, False, False, False),
+            (True, False, True, False),
+            (False, True, False, True),
+        ],
+    )
+    def test_no_color_interaction(
+        self, cli_colors, cli_colors_file, flag_colors, flag_colors_file
+    ):
+        cli_params = []
+
+        if cli_colors is not None:
+            cli_params.append("--use-colors" if cli_colors else "--no-use-colors")
+
+        if cli_colors_file is not None:
+            cli_params.append("--use-colors-file" if cli_colors_file else "--no-use-colors-file")
+
+        cli_params.append("run")
+
+        context = self.make_dbt_context("run", cli_params)
+
+        flags = Flags(context, None)
+
+        assert flags.USE_COLORS == flag_colors
+        assert flags.USE_COLORS_FILE == flag_colors_file
+
+    @pytest.mark.parametrize(
+        "cli_log_level,cli_log_level_file,flag_log_level,flag_log_level_file",
+        [
+            (None, None, "info", "debug"),
+            ("error", None, "error", "error"),  # explicit level overrides file level...
+            ("info", None, "info", "info"),  # ...but file level doesn't change console level
+            (
+                "debug",
+                "warn",
+                "debug",
+                "warn",
+            ),  # still, two separate explicit levels are applied independently
+        ],
+    )
+    def test_log_level_interaction(
+        self, cli_log_level, cli_log_level_file, flag_log_level, flag_log_level_file
+    ):
+        cli_params = []
+
+        if cli_log_level is not None:
+            cli_params.append("--log-level")
+            cli_params.append(cli_log_level)
+
+        if cli_log_level_file is not None:
+            cli_params.append("--log-level-file")
+            cli_params.append(cli_log_level_file)
+
+        cli_params.append("run")
+
+        context = self.make_dbt_context("run", cli_params)
+
+        flags = Flags(context, None)
+
+        assert flags.LOG_LEVEL == flag_log_level
+        assert flags.LOG_LEVEL_FILE == flag_log_level_file
+
+    @pytest.mark.parametrize(
+        "cli_log_format,cli_log_format_file,flag_log_format,flag_log_format_file",
+        [
+            (None, None, "default", "debug"),
+            ("json", None, "json", "json"),  # explicit format overrides file format...
+            (None, "json", "default", "json"),  # ...but file format doesn't change console format
+            (
+                "debug",
+                "text",
+                "debug",
+                "text",
+            ),  # still, two separate explicit formats are applied independently
+        ],
+    )
+    def test_log_format_interaction(
+        self, cli_log_format, cli_log_format_file, flag_log_format, flag_log_format_file
+    ):
+        cli_params = []
+
+        if cli_log_format is not None:
+            cli_params.append("--log-format")
+            cli_params.append(cli_log_format)
+
+        if cli_log_format_file is not None:
+            cli_params.append("--log-format-file")
+            cli_params.append(cli_log_format_file)
+
+        cli_params.append("run")
+
+        context = self.make_dbt_context("run", cli_params)
+
+        flags = Flags(context, None)
+
+        assert flags.LOG_FORMAT == flag_log_format
+        assert flags.LOG_FORMAT_FILE == flag_log_format_file
+
+    def test_log_settings_from_config(self):
+        """Test that values set in UserConfig for log settings will set flags as expected"""
+        context = self.make_dbt_context("run", ["run"])
+
+        config = UserConfig(log_format="json", log_level="warn", use_colors=False)
+
+        flags = Flags(context, config)
+
+        assert flags.LOG_FORMAT == "json"
+        assert flags.LOG_FORMAT_FILE == "json"
+        assert flags.LOG_LEVEL == "warn"
+        assert flags.LOG_LEVEL_FILE == "warn"
+        assert flags.USE_COLORS is False
+        assert flags.USE_COLORS_FILE is False
+
+    def test_log_file_settings_from_config(self):
+        """Test that values set in UserConfig for log *file* settings will set flags as expected, leaving the console
+        logging flags with their default values"""
+        context = self.make_dbt_context("run", ["run"])
+
+        config = UserConfig(log_format_file="json", log_level_file="warn", use_colors_file=False)
+
+        flags = Flags(context, config)
+
+        assert flags.LOG_FORMAT == "default"
+        assert flags.LOG_FORMAT_FILE == "json"
+        assert flags.LOG_LEVEL == "info"
+        assert flags.LOG_LEVEL_FILE == "warn"
+        assert flags.USE_COLORS is True
+        assert flags.USE_COLORS_FILE is False
+
+    def test_duplicate_flags_raises_error(self):
+        parent_context = self.make_dbt_context("parent", ["--version-check"])
+        context = self.make_dbt_context("child", ["--version-check"], parent_context)
+
+        with pytest.raises(DbtUsageException):
+            Flags(context)
+
+    def _create_flags_from_dict(self, cmd, d):
+        write_file("", "profiles.yml")
+        result = Flags.from_dict(cmd, d)
+        assert result.which is cmd.value
+        rm_file("profiles.yml")
+        return result
+
+    def test_from_dict__run(self):
+        args_dict = {
+            "print": False,
+            "select": ["model_one", "model_two"],
+        }
+        result = self._create_flags_from_dict(Command.RUN, args_dict)
+        assert "model_one" in result.select[0]
+        assert "model_two" in result.select[0]
+
+    def test_from_dict__build(self):
+        args_dict = {
+            "print": True,
+            "state": "some/path",
+        }
+        result = self._create_flags_from_dict(Command.BUILD, args_dict)
+        assert result.print is True
+        assert "some/path" in str(result.state)
+
+    def test_from_dict__seed(self):
+        args_dict = {"use_colors": False, "exclude": ["model_three"]}
+        result = self._create_flags_from_dict(Command.SEED, args_dict)
+        assert result.use_colors is False
+        assert "model_three" in result.exclude[0]
+
+    def test_from_dict__which_fails(self):
+        args_dict = {"which": "some bad command"}
+        with pytest.raises(DbtInternalError, match=r"does not match value of which"):
+            self._create_flags_from_dict(Command.RUN, args_dict)
+
+    def test_from_dict_0_value(self):
+        args_dict = {"log_file_max_bytes": 0}
+        flags = Flags.from_dict(Command.RUN, args_dict)
+        assert flags.LOG_FILE_MAX_BYTES == 0

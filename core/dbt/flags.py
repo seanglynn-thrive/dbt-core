@@ -3,6 +3,7 @@ from os import getenv as os_getenv
 from argparse import Namespace
 from multiprocessing import get_context
 from typing import Optional
+from pathlib import Path
 
 
 # for setting up logger for legacy logger
@@ -18,11 +19,6 @@ def env_set_truthy(key: str) -> Optional[str]:
 
 # for setting up logger for legacy logger
 ENABLE_LEGACY_LOGGER = env_set_truthy("DBT_ENABLE_LEGACY_LOGGER")
-LOG_FORMAT = None
-DEBUG = None
-USE_COLORS = None
-LOG_CACHE_EVENTS = None
-QUIET = None
 
 # This is not a flag, it's a place to store the lock
 MP_CONTEXT = get_context()
@@ -47,6 +43,15 @@ def set_from_args(args: Namespace, user_config):
     global GLOBAL_FLAGS
     from dbt.cli.main import cli
     from dbt.cli.flags import Flags, convert_config
+
+    # we set attributes of args after initialize the flags, but user_config
+    # is being read in the Flags constructor, so we need to read it here and pass in
+    # to make sure we use the correct user_config
+    if (hasattr(args, "PROFILES_DIR") or hasattr(args, "profiles_dir")) and not user_config:
+        from dbt.config.profile import read_user_config
+
+        profiles_dir = getattr(args, "PROFILES_DIR", None) or getattr(args, "profiles_dir")
+        user_config = read_user_config(profiles_dir)
 
     # make a dummy context to get the flags, totally arbitrary
     ctx = cli.make_context("run", ["run"])
@@ -79,8 +84,10 @@ def get_flag_dict():
         "quiet",
         "no_print",
         "cache_selected_only",
+        "introspect",
         "target_path",
         "log_path",
+        "invocation_command",
     }
     return {key: getattr(GLOBAL_FLAGS, key.upper(), None) for key in flag_attr}
 
@@ -90,6 +97,8 @@ def get_flag_dict():
 def get_flag_obj():
     new_flags = Namespace()
     for key, val in get_flag_dict().items():
+        if isinstance(val, Path):
+            val = str(val)
         setattr(new_flags, key.upper(), val)
     # The following 3 are CLI arguments only so they're not full-fledged flags,
     # but we put in flags for users.

@@ -1,8 +1,9 @@
+import pytest
 import re
 from typing import TypeVar
 
-from dbt.contracts.results import TimingInfo
-from dbt.events import AdapterLogger, test_types, types
+from dbt.contracts.results import TimingInfo, RunResult, RunStatus
+from dbt.events import AdapterLogger, types
 from dbt.events.base_types import (
     BaseEvent,
     DebugLevel,
@@ -13,7 +14,16 @@ from dbt.events.base_types import (
     WarnLevel,
     msg_from_base_event,
 )
-from dbt.events.functions import msg_to_dict, msg_to_json
+from dbt.events.eventmgr import TestEventManager, EventManager
+from dbt.events.functions import msg_to_dict, msg_to_json, ctx_set_event_manager
+from dbt.events.helpers import get_json_string_utcnow
+from dbt.events.types import RunResultError
+from dbt.flags import set_from_args
+from argparse import Namespace
+
+from dbt.task.printer import print_run_result_error
+
+set_from_args(Namespace(WARN_ERROR=False), None)
 
 
 # takes in a class and finds any subclasses for it
@@ -45,14 +55,14 @@ class TestAdapterLogger:
         logger.debug("hello {}", "world")
 
         # enters lower in the call stack to test that it formats correctly
-        event = types.AdapterEventDebug(name="dbt_tests", base_msg="hello {}", args=("world",))
+        event = types.AdapterEventDebug(name="dbt_tests", base_msg="hello {}", args=["world"])
         assert "hello world" in event.message()
 
         # tests that it doesn't throw
-        logger.debug("1 2 {}", 3)
+        logger.debug("1 2 {}", "3")
 
         # enters lower in the call stack to test that it formats correctly
-        event = types.AdapterEventDebug(name="dbt_tests", base_msg="1 2 {}", args=(3,))
+        event = types.AdapterEventDebug(name="dbt_tests", base_msg="1 2 {}", args=[3])
         assert "1 2 3" in event.message()
 
         # tests that it doesn't throw
@@ -61,13 +71,13 @@ class TestAdapterLogger:
         # enters lower in the call stack to test that it formats correctly
         # in this case it's that we didn't attempt to replace anything since there
         # were no args passed after the initial message
-        event = types.AdapterEventDebug(name="dbt_tests", base_msg="boop{x}boop", args=())
+        event = types.AdapterEventDebug(name="dbt_tests", base_msg="boop{x}boop", args=[])
         assert "boop{x}boop" in event.message()
 
         # ensure AdapterLogger and subclasses makes all base_msg members
         # of type string; when someone writes logger.debug(a) where a is
         # any non-string object
-        event = types.AdapterEventDebug(name="dbt_tests", base_msg=[1, 2, 3], args=(3,))
+        event = types.AdapterEventDebug(name="dbt_tests", base_msg=[1, 2, 3], args=[3])
         assert isinstance(event.base_msg, str)
 
         event = types.JinjaLogDebug(msg=[1, 2, 3])
@@ -124,11 +134,16 @@ sample_values = [
     types.MetricAttributesRenamed(metric_name=""),
     types.ExposureNameDeprecation(exposure=""),
     types.InternalDeprecation(name="", reason="", suggested_action="", version=""),
+    types.EnvironmentVariableRenamed(old_name="", new_name=""),
+    types.ConfigLogPathDeprecation(deprecated_path=""),
+    types.ConfigTargetPathDeprecation(deprecated_path=""),
+    types.CollectFreshnessReturnSignature(),
     # E - DB Adapter ======================
     types.AdapterEventDebug(),
     types.AdapterEventInfo(),
     types.AdapterEventWarning(),
     types.AdapterEventError(),
+    types.AdapterRegistered(adapter_name="dbt-awesome", adapter_version="1.2.3"),
     types.NewConnection(conn_type="", conn_name=""),
     types.ConnectionReused(conn_name=""),
     types.ConnectionLeftOpenInCleanup(conn_name=""),
@@ -146,14 +161,14 @@ sample_values = [
     types.ColTypeChange(
         orig_type="",
         new_type="",
-        table=types.ReferenceKeyMsg(database="", schema="", identifier=""),
+        table={"database": "", "schema": "", "identifier": ""},
     ),
-    types.SchemaCreation(relation=types.ReferenceKeyMsg(database="", schema="", identifier="")),
-    types.SchemaDrop(relation=types.ReferenceKeyMsg(database="", schema="", identifier="")),
+    types.SchemaCreation(relation={"database": "", "schema": "", "identifier": ""}),
+    types.SchemaDrop(relation={"database": "", "schema": "", "identifier": ""}),
     types.CacheAction(
         action="adding_relation",
-        ref_key=types.ReferenceKeyMsg(database="", schema="", identifier=""),
-        ref_key_2=types.ReferenceKeyMsg(database="", schema="", identifier=""),
+        ref_key={"database": "", "schema": "", "identifier": ""},
+        ref_key_2={"database": "", "schema": "", "identifier": ""},
     ),
     types.CacheDumpGraph(before_after="before", action="rename", dump=dict()),
     types.AdapterImportError(exc=""),
@@ -169,11 +184,13 @@ sample_values = [
     types.DatabaseErrorRunningHook(hook_type=""),
     types.HooksRunning(num_hooks=0, hook_type=""),
     types.FinishedRunningStats(stat_line="", execution="", execution_time=0),
+    types.ConstraintNotEnforced(constraint="", adapter=""),
+    types.ConstraintNotSupported(constraint="", adapter=""),
     # I - Project parsing ======================
-    types.ParseCmdOut(msg="testing"),
-    types.ParseCmdPerfInfoPath(path=""),
-    types.GenericTestFileParse(path=""),
-    types.MacroFileParse(path=""),
+    types.InputFileDiffError(category="testing", file_id="my_file"),
+    types.InvalidValueForField(field_name="test", field_value="test"),
+    types.ValidationWarning(resource_type="model", field_name="access", node_name="my_macro"),
+    types.ParsePerfInfoPath(path=""),
     types.PartialParsingErrorProcessingFile(file=""),
     types.PartialParsingFile(file_id=""),
     types.PartialParsingError(exc_info={}),
@@ -215,6 +232,26 @@ sample_values = [
     types.JinjaLogWarning(),
     types.JinjaLogInfo(msg=""),
     types.JinjaLogDebug(msg=""),
+    types.UnpinnedRefNewVersionAvailable(
+        ref_node_name="", ref_node_package="", ref_node_version="", ref_max_version=""
+    ),
+    types.DeprecatedModel(model_name="", model_version="", deprecation_date=""),
+    types.DeprecatedReference(
+        model_name="",
+        ref_model_name="",
+        ref_model_package="",
+        ref_model_deprecation_date="",
+        ref_model_latest_version="",
+    ),
+    types.UpcomingReferenceDeprecation(
+        model_name="",
+        ref_model_name="",
+        ref_model_package="",
+        ref_model_deprecation_date="",
+        ref_model_latest_version="",
+    ),
+    types.UnsupportedConstraintMaterialization(materialized=""),
+    types.ParseInlineNodeError(exc=""),
     # M - Deps generation ======================
     types.GitSparseCheckoutSubdirectory(subdir=""),
     types.GitProgressCheckoutRevision(revision=""),
@@ -232,7 +269,7 @@ sample_values = [
     types.DepsUpdateAvailable(version_latest=""),
     types.DepsUpToDate(),
     types.DepsListSubdirectory(subdirectory=""),
-    types.DepsNotifyUpdatesAvailable(packages=types.ListOfStrings()),
+    types.DepsNotifyUpdatesAvailable(packages=["my_pkg", "other_pkg"]),
     types.RetryExternalCall(attempt=0, max=0),
     types.RecordRetryException(exc=""),
     types.RegistryIndexProgressGETRequest(url=""),
@@ -247,6 +284,7 @@ sample_values = [
     types.DepsAddPackage(package_name="", version="", packages_filepath=""),
     types.DepsFoundDuplicatePackage(removed_package={}),
     types.DepsVersionMissing(source=""),
+    types.SemanticValidationFailure(msg=""),
     # Q - Node execution ======================
     types.RunningOperationCaughtError(exc=""),
     types.CompileComplete(),
@@ -260,7 +298,7 @@ sample_values = [
         execution_time=0,
         num_failures=0,
     ),
-    types.LogStartLine(description="", index=0, total=0, node_info=types.NodeInfo()),
+    types.LogStartLine(description="", index=0, total=0),
     types.LogModelResult(
         description="",
         status="",
@@ -293,13 +331,13 @@ sample_values = [
     ),
     types.LogCancelLine(conn_name=""),
     types.DefaultSelector(name=""),
-    types.NodeStart(node_info=types.NodeInfo()),
-    types.NodeFinished(node_info=types.NodeInfo()),
+    types.NodeStart(),
+    types.NodeFinished(),
     types.QueryCancelationUnsupported(type=""),
     types.ConcurrencyLine(num_threads=0, target_name=""),
-    types.WritingInjectedSQLForNode(node_info=types.NodeInfo()),
-    types.NodeCompiling(node_info=types.NodeInfo()),
-    types.NodeExecuting(node_info=types.NodeInfo()),
+    types.WritingInjectedSQLForNode(),
+    types.NodeCompiling(),
+    types.NodeExecuting(),
     types.LogHookStartLine(
         statement="",
         index=0,
@@ -325,6 +363,11 @@ sample_values = [
     types.NoNodesSelected(),
     types.DepsUnpinned(revision="", git=""),
     types.NoNodesForSelectionCriteria(spec_raw=""),
+    types.CommandCompleted(
+        command="", success=True, elapsed=0.1, completed_at=get_json_string_utcnow()
+    ),
+    types.ShowNode(node_name="", preview="", is_inline=True, unique_id="model.test.my_model"),
+    types.CompiledNode(node_name="", compiled="", is_inline=True, unique_id="model.test.my_model"),
     # W - Node testing ======================
     types.CatchableExceptionOnRun(exc=""),
     types.InternalErrorOnRun(build_path="", exc=""),
@@ -335,11 +378,10 @@ sample_values = [
     types.MainKeyboardInterrupt(),
     types.MainEncounteredError(exc=""),
     types.MainStackTrace(stack_trace=""),
-    types.SystemErrorRetrievingModTime(path=""),
     types.SystemCouldNotWrite(path="", reason="", exc=""),
     types.SystemExecutingCmd(cmd=[""]),
-    types.SystemStdOut(bmsg=b""),
-    types.SystemStdErr(bmsg=b""),
+    types.SystemStdOut(bmsg=str(b"")),
+    types.SystemStdErr(bmsg=str(b"")),
     types.SystemReportReturnCode(returncode=0),
     types.TimingInfoCollected(),
     types.LogDebugStackTrace(),
@@ -355,8 +397,6 @@ sample_values = [
     types.RunResultErrorNoMessage(status=""),
     types.SQLCompiledPath(path=""),
     types.CheckNodeTestFailure(relation_name=""),
-    types.FirstRunResultError(msg=""),
-    types.AfterFirstRunResultError(msg=""),
     types.EndOfRunSummary(num_errors=0, num_warnings=0, keyboard_interrupt=False),
     types.LogSkipBecauseError(schema="", relation="", index=0, total=0),
     types.EnsureGitInstalled(),
@@ -374,13 +414,6 @@ sample_values = [
     types.DebugCmdResult(),
     types.ListCmdOut(),
     types.Note(msg="This is a note."),
-    # T - tests ======================
-    test_types.IntegrationTestInfo(),
-    test_types.IntegrationTestDebug(),
-    test_types.IntegrationTestWarn(),
-    test_types.IntegrationTestError(),
-    test_types.IntegrationTestException(),
-    test_types.UnitTestInfo(),
 ]
 
 
@@ -404,18 +437,31 @@ class TestEventJSONSerialization:
             assert type(event) != type
 
         # if we have everything we need to test, try to serialize everything
+        count = 0
         for event in sample_values:
             msg = msg_from_base_event(event)
+            print(f"--- msg: {msg.info.name}")
+            # Serialize to dictionary
             try:
                 msg_to_dict(msg)
             except Exception as e:
                 raise Exception(
                     f"{event} can not be converted to a dict. Originating exception: {e}"
                 )
+            # Serialize to json
             try:
                 msg_to_json(msg)
             except Exception as e:
                 raise Exception(f"{event} is not serializable to json. Originating exception: {e}")
+            # Serialize to binary
+            try:
+                msg.SerializeToString()
+            except Exception as e:
+                raise Exception(
+                    f"{event} is not serializable to binary protobuf. Originating exception: {e}"
+                )
+            count += 1
+        print(f"--- Found {count} events")
 
 
 T = TypeVar("T")
@@ -428,3 +474,52 @@ def test_date_serialization():
     ti_dict = ti.to_dict()
     assert ti_dict["started_at"].endswith("Z")
     assert ti_dict["completed_at"].endswith("Z")
+
+
+def test_bad_serialization():
+    """Tests that bad serialization enters the proper exception handling
+
+    When pytest is in use the exception handling of `BaseEvent` raises an
+    exception. When pytest isn't present, it fires a Note event. Thus to test
+    that bad serializations are properly handled, the best we can do is test
+    that the exception handling path is used.
+    """
+
+    with pytest.raises(Exception) as excinfo:
+        types.Note(param_event_doesnt_have="This should break")
+
+    assert (
+        str(excinfo.value)
+        == "[Note]: Unable to parse dict {'param_event_doesnt_have': 'This should break'}"
+    )
+
+
+def test_single_run_error():
+
+    try:
+        # Add a recording event manager to the context, so we can test events.
+        event_mgr = TestEventManager()
+        ctx_set_event_manager(event_mgr)
+
+        error_result = RunResult(
+            status=RunStatus.Error,
+            timing=[],
+            thread_id="",
+            execution_time=0.0,
+            node=None,
+            adapter_response=dict(),
+            message="oh no!",
+            failures=[],
+        )
+
+        print_run_result_error(error_result)
+        events = [e for e in event_mgr.event_history if isinstance(e[0], RunResultError)]
+
+        assert len(events) == 1
+        assert events[0][0].msg == "oh no!"
+
+    finally:
+        # Set an empty event manager unconditionally on exit. This is an early
+        # attempt at unit testing events, and we need to think about how it
+        # could be done in a thread safe way in the long run.
+        ctx_set_event_manager(EventManager())

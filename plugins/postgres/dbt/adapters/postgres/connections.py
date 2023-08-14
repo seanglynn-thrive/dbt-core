@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 
 import psycopg2
+from psycopg2.extensions import string_types
 
 import dbt.exceptions
 from dbt.adapters.base import Credentials
@@ -50,9 +51,16 @@ class PostgresCredentials(Credentials):
             "user",
             "database",
             "schema",
+            "connect_timeout",
+            "role",
             "search_path",
             "keepalives_idle",
             "sslmode",
+            "sslcert",
+            "sslkey",
+            "sslrootcert",
+            "application_name",
+            "retries",
         )
 
 
@@ -190,3 +198,7 @@ class PostgresConnectionManager(SQLConnectionManager):
         status_messsage_strings = [part for part in status_message_parts if not part.isdigit()]
         code = " ".join(status_messsage_strings)
         return AdapterResponse(_message=message, code=code, rows_affected=rows)
+
+    @classmethod
+    def data_type_code_to_name(cls, type_code: int) -> str:
+        return string_types[type_code].name
