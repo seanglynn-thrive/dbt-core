@@ -122,7 +122,7 @@ class TestPackageRedirectDeprecation:
     def test_package_redirect(self, project):
         deprecations.reset_deprecations()
         assert deprecations.active_deprecations == set()
-        run_dbt(["deps", "install"])
+        run_dbt(["deps"])
         expected = {"package-redirect"}
         assert expected == deprecations.active_deprecations
 
@@ -131,7 +131,7 @@ class TestPackageRedirectDeprecation:
         deprecations.reset_deprecations()
         assert deprecations.active_deprecations == set()
         with pytest.raises(dbt.exceptions.CompilationError) as exc:
-            run_dbt(["--warn-error", "deps", "install"])
+            run_dbt(["--warn-error", "deps"])
         exc_str = " ".join(str(exc.value).split())  # flatten all whitespace
         expected_msg = "The `fishtown-analytics/dbt_utils` package is deprecated in favor of `dbt-labs/dbt_utils`"
         assert expected_msg in exc_str

@@ -106,7 +106,7 @@ class TestDuplicateModelAliasEnabledAcrossPackages:
         return {"packages": [{"local": "local_dependency"}]}
 
     def test_duplicate_model_alias_enabled_across_packages(self, project):
-        run_dbt(["deps", "install"])
+        run_dbt(["deps"])
         message = "dbt found two resources with the database representation"
         with pytest.raises(AmbiguousAliasError) as exc:
             run_dbt(["run"])
@@ -131,7 +131,7 @@ class TestDuplicateModelDisabledAcrossPackages:
         return {"packages": [{"local": "local_dependency"}]}
 
     def test_duplicate_model_disabled_across_packages(self, project):
-        run_dbt(["deps", "install"])
+        run_dbt(["deps"])
         results = run_dbt(["compile"])
         assert len(results) == 1
 

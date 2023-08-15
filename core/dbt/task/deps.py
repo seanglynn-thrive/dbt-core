@@ -6,7 +6,8 @@ import dbt.deprecations
 import dbt.exceptions
 
 from dbt.config.renderer import DbtProjectYamlRenderer
-from dbt.config.project import package_config_from_data, package_and_project_data_from_root
+from dbt.config.project import package_config_from_data, get_package_lock_data
+from dbt.constants import PACKAGE_LOCK_FILE_NAME
 from dbt.deps.base import downloads_directory
 from dbt.deps.resolver import resolve_lock_packages, resolve_packages
 from dbt.deps.registry import RegistryPinnedPackage
@@ -106,9 +107,8 @@ class DepsTask(BaseTask):
 
         system.make_directory(self.project.packages_install_path)
 
-        packages_lock_dict, _ = package_and_project_data_from_root(
-            self.project.project_root, "package-lock.yml"
-        )
+        packages_lock_dict = get_package_lock_data(self.project.project_root)
+
         packages_lock_config = package_config_from_data(packages_lock_dict).packages
 
         if not packages_lock_config:
@@ -159,7 +159,7 @@ class LockTask(BaseTask):
         self.cli_vars = args.vars
 
     def run(self):
-        lock_filepath = f"{self.project.project_root}/package-lock.yml"
+        lock_filepath = f"{self.project.project_root}/{PACKAGE_LOCK_FILE_NAME}"
 
         packages = self.project.packages.packages
         packages_installed = {"packages": []}
@@ -246,6 +246,8 @@ class AddTask(BaseTask):
 
         if not self.args.dry_run:
             fire_event(
-                DepsLockUpdating(lock_filepath=f"{self.project.project_root}/package-lock.yml")
+                DepsLockUpdating(
+                    lock_filepath=f"{self.project.project_root}/{PACKAGE_LOCK_FILE_NAME}"
+                )
             )
             LockTask(self.args, self.project).run()

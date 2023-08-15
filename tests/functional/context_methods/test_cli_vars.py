@@ -138,7 +138,7 @@ class TestCLIVarsPackages:
 
     def test_cli_vars_in_packages(self, project, packages_config):
         # Run working deps and run commands
-        run_dbt(["deps", "install"])
+        run_dbt(["deps"])
         results = run_dbt(["run"])
         assert len(results) == 1
 
@@ -149,12 +149,10 @@ class TestCLIVarsPackages:
 
         # Without vars args deps fails
         with pytest.raises(DbtRuntimeError):
-            run_dbt(["deps", "install"])
+            run_dbt(["deps"])
 
         # With vars arg deps succeeds
-        results = run_dbt(
-            ["deps", "install", "--vars", "path_to_project: dbt_integration_project"]
-        )
+        results = run_dbt(["deps", "--vars", "path_to_project: dbt_integration_project"])
         assert results is None
 
 

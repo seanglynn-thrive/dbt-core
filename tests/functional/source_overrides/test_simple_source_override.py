@@ -93,7 +93,7 @@ class TestSourceOverride:
     def test_source_overrides(self, project):
         insert_id = 101
 
-        run_dbt(["deps", "install"])
+        run_dbt(["deps"])
 
         seed_results = run_dbt(["seed"])
         assert len(seed_results) == 5

@@ -9,7 +9,7 @@ from tests.functional.graph_selection.fixtures import SelectionFixtures
 
 def run_schema_and_assert(project, include, exclude, expected_tests):
     # deps must run before seed
-    run_dbt(["deps", "install"])
+    run_dbt(["deps"])
     run_dbt(["seed"])
     results = run_dbt(["run", "--exclude", "never_selected"])
     assert len(results) == 12

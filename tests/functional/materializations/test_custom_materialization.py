@@ -23,7 +23,7 @@ class TestOverrideAdapterDependency:
         return {"packages": [{"local": "override-view-adapter-dep"}]}
 
     def test_adapter_dependency(self, project, override_view_adapter_dep):
-        run_dbt(["deps", "install"])
+        run_dbt(["deps"])
         # this should error because the override is buggy
         run_dbt(["run"], expect_pass=False)
 
@@ -34,7 +34,7 @@ class TestOverrideDefaultDependency:
         return {"packages": [{"local": "override-view-default-dep"}]}
 
     def test_default_dependency(self, project, override_view_default_dep):
-        run_dbt(["deps", "install"])
+        run_dbt(["deps"])
         # this should error because the override is buggy
         run_dbt(["run"], expect_pass=False)
 
@@ -45,7 +45,7 @@ class TestOverrideAdapterDependencyPassing:
         return {"packages": [{"local": "override-view-adapter-pass-dep"}]}
 
     def test_default_dependency(self, project, override_view_adapter_pass_dep):
-        run_dbt(["deps", "install"])
+        run_dbt(["deps"])
         # this should pass because the override is ok
         run_dbt(["run"])
 
@@ -65,7 +65,7 @@ class TestOverrideAdapterLocal:
     def test_default_dependency(
         self, project, override_view_adapter_pass_dep, override_view_adapter_macros
     ):
-        run_dbt(["deps", "install"])
+        run_dbt(["deps"])
         # this should error because the override is buggy
         run_dbt(["run"], expect_pass=False)
 
@@ -76,6 +76,6 @@ class TestOverrideDefaultReturn:
         return {"macro-paths": ["override-view-return-no-relation"]}
 
     def test_default_dependency(self, project, override_view_return_no_relation):
-        run_dbt(["deps", "install"])
+        run_dbt(["deps"])
         results = run_dbt(["run"], expect_pass=False)
         assert "did not explicitly return a list of relations" in results[0].message

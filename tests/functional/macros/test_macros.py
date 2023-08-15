@@ -72,7 +72,7 @@ class TestMacros:
         }
 
     def test_working_macros(self, project):
-        run_dbt(["deps", "install"])
+        run_dbt(["deps"])
         results = run_dbt()
         assert len(results) == 6
 
@@ -219,7 +219,7 @@ class TestDispatchMacroOverrideBuiltin(TestMacroOverrideBuiltin):
         }
 
     def test_overrides(self, project):
-        run_dbt(["deps", "install"])
+        run_dbt(["deps"])
         run_dbt()
         run_dbt()
 

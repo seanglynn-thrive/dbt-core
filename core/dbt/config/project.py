@@ -16,7 +16,7 @@ import os
 
 from dbt.flags import get_flags
 from dbt import deprecations
-from dbt.constants import DEPENDENCIES_FILE_NAME, PACKAGES_FILE_NAME
+from dbt.constants import DEPENDENCIES_FILE_NAME, PACKAGES_FILE_NAME, PACKAGE_LOCK_FILE_NAME
 from dbt.clients.system import path_exists, resolve_path_from_base, load_file_contents
 from dbt.clients.yaml_helper import load_yaml_text
 from dbt.contracts.connection import QueryComment
@@ -92,6 +92,14 @@ class IsFQNResource(Protocol):
 def _load_yaml(path):
     contents = load_file_contents(path)
     return load_yaml_text(contents)
+
+
+def get_package_lock_data(project_root):
+    package_lock_path = resolve_path_from_base(PACKAGE_LOCK_FILE_NAME, project_root)
+    ret = {}
+    if path_exists(package_lock_path):
+        ret = _load_yaml(package_lock_path) or {}
+    return ret
 
 
 def package_and_project_data_from_root(project_root, package_file_name=PACKAGES_FILE_NAME):

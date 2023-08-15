@@ -28,7 +28,7 @@ class TestCustomVarInLogs:
 
     def test_extra_filled(self, project):
         _, log_output = run_dbt_and_capture(
-            ["--log-format=json", "deps", "install"],
+            ["--log-format=json", "deps"],
         )
         logs = parse_json_logs(log_output)
         for log in logs:

@@ -78,7 +78,7 @@ class TestExitCodesDeps:
         }
 
     def test_deps(self, project):
-        results = run_dbt(["deps", "install"])
+        results = run_dbt(["deps"])
         assert results is None
 
 
@@ -96,7 +96,7 @@ class TestExitCodesDepsFail:
 
     def test_deps_fail(self, project):
         with pytest.raises(dbt.exceptions.GitCheckoutError) as exc:
-            run_dbt(["deps", "install"])
+            run_dbt(["deps"])
         expected_msg = "Error checking out spec='bad-branch'"
         assert expected_msg in str(exc.value)
 

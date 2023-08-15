@@ -564,7 +564,7 @@ class TestCustomSchemaTests:
         self,
         project,
     ):
-        run_dbt(["deps", "install"])
+        run_dbt(["deps"])
         results = run_dbt()
         assert len(results) == 4
 
@@ -752,7 +752,7 @@ class TestSchemaTestContext:
     def test_test_context_tests(self, project):
         # This test tests the the TestContext and TestMacroNamespace
         # are working correctly
-        run_dbt(["deps", "install"])
+        run_dbt(["deps"])
         results = run_dbt()
         assert len(results) == 3
 
@@ -841,7 +841,7 @@ class TestSchemaTestContextWithMacroNamespace:
     ):
         # This test tests the the TestContext and TestMacroNamespace
         # are working correctly
-        run_dbt(["deps", "install"])
+        run_dbt(["deps"])
         results = run_dbt()
         assert len(results) == 3
 
@@ -1125,5 +1125,5 @@ class TestCustomSchemaTestMacroResolutionOrder:
         # resolve to 'some_macro' from the 'dbt' namespace during static analysis,
         # if 'some_macro' also existed in an installed package,
         # leading to the macro being missing in the TestNamespace
-        run_dbt(["deps", "install"])
+        run_dbt(["deps"])
         run_dbt(["parse"])
