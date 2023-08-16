@@ -110,8 +110,10 @@ class TestShow:
         assert "Previewing node 'sample_seed'" in log_output
 
     def test_sql_header(self, project):
-        run_dbt(["build"])
-        (results, log_output) = run_dbt_and_capture(["show", "--select", "sql_header"])
+        run_dbt(["build", "--vars", "timezone: Asia/Kolkata"])
+        (results, log_output) = run_dbt_and_capture(
+            ["show", "--select", "sql_header", "--vars", "timezone: Asia/Kolkata"]
+        )
         assert "Asia/Kolkata" in log_output
 
 
