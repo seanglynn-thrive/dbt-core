@@ -452,7 +452,7 @@ def deps(ctx, **kwargs):
 # dbt deps lock
 @deps.command("lock")
 @click.pass_context
-def lock(ctx, **kwargs):
+def deps_lock(ctx, **kwargs):
     """Pull the most recent version of the dependencies listed in packages.yml into package-lock.yml file"""
     task = LockTask(ctx.obj["flags"], ctx.obj["project"])
     results = task.run()
@@ -467,7 +467,7 @@ def lock(ctx, **kwargs):
 @p.package_version
 @p.source
 @p.dry_run
-def add(ctx, **kwargs):
+def deps_add(ctx, **kwargs):
     """Add a new package to the packages.yml file"""
     task = AddTask(ctx.obj["flags"], ctx.obj["project"])
     results = task.run()

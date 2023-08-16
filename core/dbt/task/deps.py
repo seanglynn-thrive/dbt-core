@@ -77,8 +77,9 @@ class DepsTask(BaseTask):
         move_to_nearest_project_dir(project.project_root)
         super().__init__(args=args, config=None, project=project)
         self.cli_vars = args.vars
-
-        if not system.path_exists(f"{self.project.project_root}/package-lock.yml"):
+        # TODO add some more complex logic to make sure updating the `pacakges.yml`
+        # or dependencies.yml will update the package lock file here.
+        if not system.path_exists(f"{self.project.project_root}/{PACKAGE_LOCK_FILE_NAME}"):
             LockTask(args, project).run()
 
     def track_package_install(

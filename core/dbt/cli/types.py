@@ -24,6 +24,8 @@ class Command(Enum):
     SOURCE_FRESHNESS = "freshness"
     TEST = "test"
     RETRY = "retry"
+    DEPS_LOCK = "lock"
+    DEPS_ADD = "add"
 
     @classmethod
     def from_str(cls, s: str) -> "Command":
@@ -37,4 +39,6 @@ class Command(Enum):
             Command.DOCS_GENERATE: ["docs", "generate"],
             Command.DOCS_SERVE: ["docs", "serve"],
             Command.SOURCE_FRESHNESS: ["source", "freshness"],
+            Command.DEPS_LOCK: ["deps", "lock"],
+            Command.DEPS_ADD: ["deps", "add"],
         }.get(self, [self.value])
