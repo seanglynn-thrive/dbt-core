@@ -286,6 +286,10 @@ class BaseRelation(FakeAPIObject, Hashable):
         )
         return cls.from_dict(kwargs)
 
+    @property
+    def can_be_renamed(self):
+        return any([self.is_view, self.is_table, self.is_materialized_view])
+
     def __repr__(self) -> str:
         return "<{} {}>".format(self.__class__.__name__, self.render())
 
