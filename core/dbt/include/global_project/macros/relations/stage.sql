@@ -12,6 +12,6 @@
     -- drop any pre-existing intermediate
     {{ get_drop_sql(intermediate_relation) }};
 
-    {{ get_create_sql(intermediate_relation) }}
+    {{ get_create_sql(intermediate_relation, sql) }}
 
 {%- endmacro -%}

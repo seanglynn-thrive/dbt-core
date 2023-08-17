@@ -56,18 +56,6 @@ class TestPostgresMaterializedViewsBasic(MaterializedViewBasic):
     def query_relation_type(project, relation: BaseRelation) -> Optional[str]:
         return query_relation_type(project, relation)
 
-    @pytest.mark.skip(
-        "The current implementation does not support overwriting tables with materialized views."
-    )
-    def test_materialized_view_replaces_table(self, project, my_table):
-        super().test_materialized_view_replaces_table(project, my_table)
-
-    @pytest.mark.skip(
-        "The current implementation does not support overwriting views with materialized views."
-    )
-    def test_materialized_view_replaces_view(self, project, my_view):
-        super().test_materialized_view_replaces_view(project, my_view)
-
 
 class PostgresMaterializedViewChanges(MaterializedViewChanges):
     @pytest.fixture(scope="class", autouse=True)

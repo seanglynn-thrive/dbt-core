@@ -12,6 +12,6 @@
     -- drop any pre-existing backup
     {{ get_drop_sql(backup_relation) }};
 
-    {{ get_rename_sql(relation, backup_relation) }}
+    {{ get_rename_sql(relation, backup_relation.identifier) }}
 
 {%- endmacro -%}

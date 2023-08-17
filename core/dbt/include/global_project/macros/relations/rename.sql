@@ -5,16 +5,15 @@
 
 
 {%- macro default__get_rename_sql(relation, new_name) -%}
-    {% set target_name = adapter.quote_as_configured(new_name, 'identifier') %}
 
     {%- if relation.is_view -%}
-        {{ get_rename_view_sql(relation, target_name) }}
+        {{ get_rename_view_sql(relation, new_name) }}
 
     {%- elif relation.is_table -%}
-        {{ get_rename_table_sql(relation, target_name) }}
+        {{ get_rename_table_sql(relation, new_name) }}
 
     {%- elif relation.is_materialized_view -%}
-        {{ get_rename_materialized_view_sql(relation, target_name) }}
+        {{ get_rename_materialized_view_sql(relation, new_name) }}
 
     {%- else -%}
         {{- exceptions.raise_compiler_error("`get_rename_sql` has not been implemented for: " ~ relation.type ) -}}
