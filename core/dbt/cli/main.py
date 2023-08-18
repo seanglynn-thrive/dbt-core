@@ -26,7 +26,7 @@ from dbt.task.clean import CleanTask
 from dbt.task.clone import CloneTask
 from dbt.task.compile import CompileTask
 from dbt.task.debug import DebugTask
-from dbt.task.deps import DepsTask, LockTask, AddTask
+from dbt.task.deps import DepsTask
 from dbt.task.freshness import FreshnessTask
 from dbt.task.generate import GenerateTask
 from dbt.task.init import InitTask
@@ -435,41 +435,27 @@ def debug(ctx, **kwargs):
 @p.project_dir
 @p.target
 @p.vars
+@p.package
+@p.package_version
+@p.source
+@p.dry_run
+@p.add_package
 @requires.postflight
 @requires.preflight
 @requires.unset_profile
 @requires.project
 def deps(ctx, **kwargs):
-    """Pull the most recent version of the dependencies listed in packages.yml"""
+    """Install dbt packages specified.
+    In the following case, a new `package-lock.yml` will be generated and the packages are installed:
+    - user updated the packages.yml
+    - user specify the flag --update, which means for packages that are specified as a
+      range, dbt-core will try to install the newer version
+    Otherwise, deps will use `package-lock.yml` as source of truth to install packages.
 
-    """Install the most recent version of the dependencies listed in packages.yml"""
+    There is a way to add new packages by providing an `--add` flag to deps command
+    which will allow user to specify `--package` and `--package-version`.
+    """
     task = DepsTask(ctx.obj["flags"], ctx.obj["project"])
-    results = task.run()
-    success = task.interpret_results(results)
-    return results, success
-
-
-# dbt deps lock
-@deps.command("lock")
-@click.pass_context
-def deps_lock(ctx, **kwargs):
-    """Pull the most recent version of the dependencies listed in packages.yml into package-lock.yml file"""
-    task = LockTask(ctx.obj["flags"], ctx.obj["project"])
-    results = task.run()
-    success = task.interpret_results(results)
-    return results, success
-
-
-# dbt deps add
-@deps.command("add")
-@click.pass_context
-@p.package
-@p.package_version
-@p.source
-@p.dry_run
-def deps_add(ctx, **kwargs):
-    """Add a new package to the packages.yml file"""
-    task = AddTask(ctx.obj["flags"], ctx.obj["project"])
     results = task.run()
     success = task.interpret_results(results)
     return results, success

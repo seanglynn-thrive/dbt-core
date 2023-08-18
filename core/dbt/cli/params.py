@@ -6,6 +6,12 @@ from dbt.cli.option_types import YAML, ChoiceTuple, WarnErrorOptionsType
 from dbt.cli.resolvers import default_project_dir, default_profiles_dir
 from dbt.version import get_version_information
 
+add_package = click.option(
+    "--add",
+    help="Add a package to current package spec with `--package` and `--package-version`",
+    envvar=None,
+    is_flag=True,
+)
 args = click.option(
     "--args",
     envvar=None,
@@ -73,17 +79,9 @@ dry_run = click.option(
     "--dry-run",
     envvar=None,
     help="Option to run `dbt deps add` without updating package-lock.yml file.",
-    default=False,
-    type=click.BOOL,
+    is_flag=True,
 )
 
-dry_run = click.option(
-    "--dry-run",
-    envvar=None,
-    help="Option to run `dbt deps add` without updating package-lock.yml file.",
-    default=False,
-    type=click.BOOL,
-)
 
 enable_legacy_logger = click.option(
     "--enable-legacy-logger/--no-enable-legacy-logger",

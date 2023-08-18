@@ -283,7 +283,6 @@ sample_values = [
     types.DepsLockUpdating(lock_filepath=""),
     types.DepsAddPackage(package_name="", version="", packages_filepath=""),
     types.DepsFoundDuplicatePackage(removed_package={}),
-    types.DepsVersionMissing(source=""),
     types.SemanticValidationFailure(msg=""),
     # Q - Node execution ======================
     types.RunningOperationCaughtError(exc=""),

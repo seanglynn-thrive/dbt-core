@@ -1512,14 +1512,6 @@ class DepsFoundDuplicatePackage(InfoLevel):
         return f"Found duplicate package in packages.yml, removing: {self.removed_package}"
 
 
-class DepsVersionMissing(InfoLevel):
-    def code(self):
-        return "M035"
-
-    def message(self) -> str:
-        return f"Version is required to add a package when source is {self.source}"
-
-
 # =======================================================
 # Q - Node execution
 # =======================================================

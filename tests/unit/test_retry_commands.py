@@ -12,8 +12,6 @@ EXCLUDED_COMMANDS = {
     "retry",
     "show",
     "serve",
-    "add",
-    "lock",
 }
 
 
