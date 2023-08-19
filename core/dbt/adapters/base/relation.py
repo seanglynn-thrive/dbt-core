@@ -169,7 +169,6 @@ class BaseRelation(FakeAPIObject, Hashable):
         return self.include(identifier=False).replace_path(identifier=None)
 
     def _render_iterator(self) -> Iterator[Tuple[Optional[ComponentName], Optional[str]]]:
-
         for key in ComponentName:
             path_part: Optional[str] = None
             if self.include_policy.get_part(key):
