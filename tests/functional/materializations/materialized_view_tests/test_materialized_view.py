@@ -56,20 +56,6 @@ class TestPostgresMaterializedViewsBasic(MaterializedViewBasic):
     def query_relation_type(project, relation: BaseRelation) -> Optional[str]:
         return query_relation_type(project, relation)
 
-    @pytest.mark.skip("")
-    def test_materialized_view_replaces_table(self, project, my_table):
-        super().test_materialized_view_replaces_table(project, my_table)
-
-    @pytest.mark.skip("")
-    def test_materialized_view_replaces_view(self, project, my_view):
-        super().test_materialized_view_replaces_view(project, my_view)
-
-    def test_table_replaces_materialized_view(self, project, my_materialized_view):
-        super().test_table_replaces_materialized_view(project, my_materialized_view)
-
-    def test_view_replaces_materialized_view(self, project, my_materialized_view):
-        super().test_view_replaces_materialized_view(project, my_materialized_view)
-
 
 class PostgresMaterializedViewChanges(MaterializedViewChanges):
     @pytest.fixture(scope="class", autouse=True)
