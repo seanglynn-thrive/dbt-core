@@ -439,6 +439,8 @@ def debug(ctx, **kwargs):
 @p.package_version
 @p.source
 @p.dry_run
+@p.lock
+@p.upgrade
 @p.add_package
 @requires.postflight
 @requires.preflight

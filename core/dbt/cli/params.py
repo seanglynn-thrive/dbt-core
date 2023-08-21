@@ -78,7 +78,7 @@ deprecated_defer = click.option(
 dry_run = click.option(
     "--dry-run",
     envvar=None,
-    help="Option to run `dbt deps add` without updating package-lock.yml file.",
+    help="Option to run `dbt deps --add` without updating package-lock.yml file.",
     is_flag=True,
 )
 
@@ -131,6 +131,13 @@ indirect_selection = click.option(
     help="Choose which tests to select that are adjacent to selected resources. Eager is most inclusive, cautious is most exclusive, and buildable is in between. Empty includes no tests at all.",
     type=click.Choice(["eager", "cautious", "buildable", "empty"], case_sensitive=False),
     default="eager",
+)
+
+lock = click.option(
+    "--lock",
+    envvar=None,
+    help="Generate the package-lock.yml file without install the packages.",
+    is_flag=True,
 )
 
 log_cache_events = click.option(
@@ -544,6 +551,13 @@ target_path = click.option(
     envvar="DBT_TARGET_PATH",
     help="Configure the 'target-path'. Only applies this setting for the current run. Overrides the 'DBT_TARGET_PATH' if it is set.",
     type=click.Path(),
+)
+
+upgrade = click.option(
+    "--upgrade",
+    envvar=None,
+    help="Upgrade packages to the latest version.",
+    is_flag=True,
 )
 
 debug_connection = click.option(

@@ -1480,17 +1480,9 @@ class NoNodesForSelectionCriteria(WarnLevel):
         return f"The selection criterion '{self.spec_raw}' does not match any nodes"
 
 
-class DepsLockCreated(InfoLevel):
-    def code(self):
-        return "M031"
-
-    def message(self) -> str:
-        return f"Created lock file in file path: {self.lock_filepath}"
-
-
 class DepsLockUpdating(InfoLevel):
     def code(self):
-        return "M032"
+        return "M031"
 
     def message(self) -> str:
         return f"Updating lock file in file path: {self.lock_filepath}"
@@ -1498,7 +1490,7 @@ class DepsLockUpdating(InfoLevel):
 
 class DepsAddPackage(InfoLevel):
     def code(self):
-        return "M033"
+        return "M032"
 
     def message(self) -> str:
         return f"Added new package {self.package_name}@{self.version} to {self.packages_filepath}"
@@ -1506,7 +1498,7 @@ class DepsAddPackage(InfoLevel):
 
 class DepsFoundDuplicatePackage(InfoLevel):
     def code(self):
-        return "M034"
+        return "M033"
 
     def message(self) -> str:
         return f"Found duplicate package in packages.yml, removing: {self.removed_package}"

@@ -279,7 +279,6 @@ sample_values = [
     types.RegistryResponseMissingNestedKeys(response=""),
     types.RegistryResponseExtraNestedKeys(response=""),
     types.DepsSetDownloadDirectory(path=""),
-    types.DepsLockCreated(lock_filepath=""),
     types.DepsLockUpdating(lock_filepath=""),
     types.DepsAddPackage(package_name="", version="", packages_filepath=""),
     types.DepsFoundDuplicatePackage(removed_package={}),

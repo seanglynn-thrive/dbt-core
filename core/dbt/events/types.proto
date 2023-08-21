@@ -1539,16 +1539,6 @@ message NoNodesForSelectionCriteriaMsg {
 }
 
 // M031
-message DepsLockCreated{
-    string lock_filepath = 1;
-}
-
-message DepsLockCreatedMsg{
-    EventInfo info = 1;
-    DepsLockCreated data = 2;
-}
-
-// M032
 message DepsLockUpdating{
     string lock_filepath = 1;
 }
@@ -1558,7 +1548,7 @@ message DepsLockUpdatingMsg{
     DepsLockUpdating data = 2;
 }
 
-// M033
+// M032
 message DepsAddPackage{
     string package_name = 1;
     string version = 2;
@@ -1570,7 +1560,7 @@ message DepsAddPackageMsg{
     DepsAddPackage data = 2;
 }
 
-//M034
+//M033
 message DepsFoundDuplicatePackage{
     map<string, string> removed_package = 1;
 }
@@ -1580,7 +1570,7 @@ message DepsFoundDuplicatePackageMsg{
     DepsFoundDuplicatePackage data = 2;
 }
 
-//M035
+//M034
 message DepsVersionMissing{
     string source = 1;
 }

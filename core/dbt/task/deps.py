@@ -19,7 +19,6 @@ from dbt.events.types import (
     DepsFoundDuplicatePackage,
     DepsInstallInfo,
     DepsListSubdirectory,
-    DepsLockCreated,
     DepsLockUpdating,
     DepsNoPackagesFound,
     DepsNotifyUpdatesAvailable,
@@ -177,16 +176,6 @@ class DepsTask(BaseTask):
                     )
                 )
 
-        if not self.args.dry_run:
-            fire_event(
-                DepsLockUpdating(
-                    lock_filepath=f"{self.project.project_root}/{PACKAGE_LOCK_FILE_NAME}"
-                )
-            )
-            self.lock()
-
-    from typing import Dict, Any
-
     def lock(self) -> None:
         lock_filepath = f"{self.project.project_root}/{PACKAGE_LOCK_FILE_NAME}"
 
@@ -214,7 +203,7 @@ class DepsTask(BaseTask):
         with open(lock_filepath, "w") as lock_obj:
             yaml.safe_dump(packages_installed, lock_obj)
 
-        fire_event(DepsLockCreated(lock_filepath=lock_filepath))
+        fire_event(DepsLockUpdating(lock_filepath=lock_filepath))
 
     def run(self) -> None:
         if self.args.ADD:
@@ -236,11 +225,11 @@ class DepsTask(BaseTask):
                 f"{self.project.project_root}/{self.project.packages_specified_path}"
             )
             previous_hash = load_yml_dict(lock_file_path).get(PACKAGE_LOCK_HASH_KEY, None)
-            if previous_hash != current_hash:
+            if previous_hash != current_hash or self.args.upgrade:
                 self.lock()
 
-        # Only specified when running add.
-        if self.args.dry_run:
+        # Early return when dry run or lock only.
+        if self.args.dry_run or self.args.lock:
             return
 
         if system.path_exists(self.project.packages_install_path):
