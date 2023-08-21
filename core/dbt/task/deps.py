@@ -162,6 +162,8 @@ class DepsTask(BaseTask):
             packages_yml = self.check_for_duplicate_packages(packages_yml)
             packages_yml["packages"].append(new_package_entry)
 
+        self.project.packages.packages = package_config_from_data(packages_yml).packages
+
         if packages_yml:
             with open(packages_yml_filepath, "w") as pkg_obj:
                 pkg_obj.write(
@@ -219,13 +221,15 @@ class DepsTask(BaseTask):
         lock_file_path = f"{self.project.project_root}/{PACKAGE_LOCK_FILE_NAME}"
         if not system.path_exists(lock_file_path):
             self.lock()
+        elif self.args.upgrade:
+            self.lock()
         else:
             # Check dependency definition is modified or not.
             current_hash = _create_sha1_hash(
                 f"{self.project.project_root}/{self.project.packages_specified_path}"
             )
             previous_hash = load_yml_dict(lock_file_path).get(PACKAGE_LOCK_HASH_KEY, None)
-            if previous_hash != current_hash or self.args.upgrade:
+            if previous_hash != current_hash:
                 self.lock()
 
         # Early return when dry run or lock only.
