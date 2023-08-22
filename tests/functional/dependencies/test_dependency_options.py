@@ -39,7 +39,7 @@ class TestDepsOptions(object):
   version: 0.4.7
 - package: dbt-labs/dbt_utils
   version: 1.1.1
-sha1_hash: 3878a8e26d5f2a42b8b034c9f1548f250f8c5038
+sha1_hash: aa75fb5fbd81cfa88ca4b8275736dc157826edea
 """
         )
 
@@ -56,7 +56,7 @@ sha1_hash: 3878a8e26d5f2a42b8b034c9f1548f250f8c5038
   version: 0.4.7
 - package: dbt-labs/dbt_utils
   version: 1.1.1
-sha1_hash: 3878a8e26d5f2a42b8b034c9f1548f250f8c5038
+sha1_hash: aa75fb5fbd81cfa88ca4b8275736dc157826edea
 """
         )
 

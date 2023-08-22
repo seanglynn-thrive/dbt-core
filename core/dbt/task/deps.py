@@ -5,6 +5,7 @@ from pathlib import Path
 import dbt.utils
 import dbt.deprecations
 import dbt.exceptions
+import json
 
 from dbt.config.renderer import DbtProjectYamlRenderer
 from dbt.config.project import package_config_from_data, load_yml_dict
@@ -12,6 +13,7 @@ from dbt.constants import PACKAGE_LOCK_FILE_NAME, PACKAGE_LOCK_HASH_KEY
 from dbt.deps.base import downloads_directory
 from dbt.deps.resolver import resolve_lock_packages, resolve_packages
 from dbt.deps.registry import RegistryPinnedPackage
+from dbt.contracts.project import Package
 
 from dbt.events.functions import fire_event
 from dbt.events.types import (
@@ -39,21 +41,21 @@ class dbtPackageDumper(yaml.Dumper):
         return super(dbtPackageDumper, self).increase_indent(flow, False)
 
 
-def _create_sha1_hash(filepath):
-    """Create a SHA1 hash of a file
+def _create_sha1_hash(packages: list[Package]):
+    """Create a SHA1 hash of the packages list,
+    this is used to determine if the packages for current execution matches
+    the previous lock.
 
     Args:
-        filepath (str): Path to file to create SHA1 hash of
+        list[Packages]: list of packages specified that are already rendered
 
     Returns:
-        str: SHA1 hash of file
+        str: SHA1 hash of the packages list
     """
-    sha1_hash = sha1()
+    package_strs = [json.dumps(package.to_dict(), sort_keys=True) for package in packages]
+    package_strs = sorted(package_strs)
 
-    with open(filepath, "rb") as fp:
-        sha1_hash.update(fp.read())
-
-    return sha1_hash.hexdigest()
+    return sha1("\n".join(package_strs).encode("utf-8")).hexdigest()
 
 
 def _create_packages_yml_entry(package, version, source):
@@ -199,7 +201,7 @@ class DepsTask(BaseTask):
             )
             packages_installed["packages"].append(lock_entry)
         packages_installed[PACKAGE_LOCK_HASH_KEY] = _create_sha1_hash(
-            f"{self.project.project_root}/{self.project.packages_specified_path}"
+            self.project.packages.packages
         )
 
         with open(lock_filepath, "w") as lock_obj:
@@ -225,9 +227,7 @@ class DepsTask(BaseTask):
             self.lock()
         else:
             # Check dependency definition is modified or not.
-            current_hash = _create_sha1_hash(
-                f"{self.project.project_root}/{self.project.packages_specified_path}"
-            )
+            current_hash = _create_sha1_hash(self.project.packages.packages)
             previous_hash = load_yml_dict(lock_file_path).get(PACKAGE_LOCK_HASH_KEY, None)
             if previous_hash != current_hash:
                 self.lock()
