@@ -1,5 +1,5 @@
 from hashlib import sha1
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 import yaml
 from pathlib import Path
 import dbt.utils
@@ -41,7 +41,7 @@ class dbtPackageDumper(yaml.Dumper):
         return super(dbtPackageDumper, self).increase_indent(flow, False)
 
 
-def _create_sha1_hash(packages: list[Package]):
+def _create_sha1_hash(packages: List[Package]):
     """Create a SHA1 hash of the packages list,
     this is used to determine if the packages for current execution matches
     the previous lock.
