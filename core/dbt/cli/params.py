@@ -40,6 +40,14 @@ compile_docs = click.option(
     default=True,
 )
 
+compile_suppress_ephemeral_ctes = click.option(
+    "--suppress-ephemeral-ctes/--no-suppress-ephemeral-ctes",
+    envvar="DBT_SUPPRESS_EPHEMERAL_CTES",
+    help="Internal flag for whether to supress injecting referenced ephemeral models' CTEs during `compile`.",
+    hidden=True,
+    default=False,
+)
+
 config_dir = click.option(
     "--config-dir",
     envvar=None,
