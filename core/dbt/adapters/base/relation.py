@@ -11,6 +11,7 @@ from dbt.contracts.relation import (
     Policy,
     Path,
 )
+from dbt.dataclass_schema import StrEnum
 from dbt.exceptions import (
     ApproximateMatchError,
     DbtInternalError,
@@ -35,7 +36,7 @@ class BaseRelation(FakeAPIObject, Hashable):
     include_policy: Policy = field(default_factory=lambda: Policy())
     quote_policy: Policy = field(default_factory=lambda: Policy())
     dbt_created: bool = False
-    relations_that_can_be_renamed: List[RelationType] = field(default_factory=list)
+    relations_that_can_be_renamed: List[StrEnum] = field(default_factory=list)
 
     def _is_exactish_match(self, field: ComponentName, value: str) -> bool:
         if self.dbt_created and self.quote_policy.get_part(field) is False:
