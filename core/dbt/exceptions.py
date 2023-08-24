@@ -279,10 +279,6 @@ class ContractBreakingChangeError(DbtRuntimeError):
         )
 
 
-class RecursionError(DbtRuntimeError):
-    pass
-
-
 class DbtValidationError(DbtRuntimeError):
     CODE = 10005
     MESSAGE = "Validation Error"
@@ -1323,7 +1319,6 @@ class TestNameNotStringError(ParsingError):
         super().__init__(msg=self.get_message())
 
     def get_message(self) -> str:
-
         msg = f"test name must be a str, got {type(self.test_name)} (value {self.test_name})"
         return msg
 
@@ -1334,7 +1329,6 @@ class TestArgsNotDictError(ParsingError):
         super().__init__(msg=self.get_message())
 
     def get_message(self) -> str:
-
         msg = f"test arguments must be a dict, got {type(self.test_args)} (value {self.test_args})"
         return msg
 
@@ -1345,7 +1339,6 @@ class TestDefinitionDictLengthError(ParsingError):
         super().__init__(msg=self.get_message())
 
     def get_message(self) -> str:
-
         msg = (
             "test definition dictionary must have exactly one key, got"
             f" {self.test} instead ({len(self.test)} keys)"
@@ -1654,7 +1647,6 @@ class ApproximateMatchError(CompilationError):
         super().__init__(msg=self.get_message())
 
     def get_message(self) -> str:
-
         msg = (
             "When searching for a relation, dbt found an approximate match. "
             "Instead of guessing \nwhich relation to use, dbt will move on. "
@@ -1974,7 +1966,6 @@ class MissingMaterializationError(CompilationError):
         super().__init__(msg=self.get_message())
 
     def get_message(self) -> str:
-
         valid_types = "'default'"
 
         if self.adapter_type != "default":
@@ -2003,7 +1994,6 @@ class AmbiguousAliasError(CompilationError):
         super().__init__(msg=self.get_message())
 
     def get_message(self) -> str:
-
         msg = (
             f'dbt found two resources with the database representation "{self.duped_name}".\ndbt '
             "cannot create two resources with identical database representations. "
