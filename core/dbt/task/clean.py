@@ -1,4 +1,5 @@
 from pathlib import Path
+from shutil import rmtree
 
 from dbt import deprecations
 from dbt.events.functions import fire_event
@@ -49,6 +50,7 @@ class CleanTask(BaseTask):
 
         for path in clean_paths:
             fire_event(CheckCleanPath(path=str(path)))
+            rmtree(path, True)
             fire_event(ConfirmCleanPath(path=str(path)))
 
         fire_event(FinishedCleanPaths())
