@@ -148,7 +148,7 @@ class Var:
         return self._cli_vars
 
     @property
-    def node_name(self):
+    def node_name(self) -> str:
         if self._node is not None:
             return self._node.name
         else:
