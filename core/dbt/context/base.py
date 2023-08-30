@@ -180,10 +180,10 @@ class Var:
 
 class BaseContext(metaclass=ContextMeta):
     # subclass is TargetContext
-    def __init__(self, cli_vars):
-        self._ctx = {}
-        self.cli_vars = cli_vars
-        self.env_vars = {}
+    def __init__(self, cli_vars: Dict[str, Any]):
+        self._ctx: Dict[str, Any] = {}
+        self.cli_vars: Dict[str, Any] = cli_vars
+        self.env_vars: Dict[str, Any] = {}
 
     def generate_builtins(self):
         builtins: Dict[str, Any] = {}
