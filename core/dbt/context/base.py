@@ -181,6 +181,10 @@ class Var:
 
 
 class BaseContext(metaclass=ContextMeta):
+    # Set by ContextMeta
+    _context_members_: Dict[str, Any]
+    _context_attrs_: Dict[str, Any]
+
     # subclass is TargetContext
     def __init__(self, cli_vars: Dict[str, Any]):
         self._ctx: Dict[str, Any] = {}
