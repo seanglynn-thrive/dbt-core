@@ -154,8 +154,9 @@ class Var:
         else:
             return "<Configuration>"
 
-    def get_missing_var(self, var_name):
-        raise RequiredVarNotFoundError(var_name, self._merged, self._node)
+    def get_missing_var(self, var_name: str) -> NoReturn:
+        # TODO function name implies a non exception resolution
+        raise RequiredVarNotFoundError(var_name, dict(self._merged), self._node)
 
     def has_var(self, var_name: str):
         return var_name in self._merged
