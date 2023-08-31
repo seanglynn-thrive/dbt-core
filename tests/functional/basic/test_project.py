@@ -72,17 +72,6 @@ class TestProjectDbtCloudConfig:
     def models(self):
         return {"simple_model.sql": simple_model_sql, "simple_model.yml": simple_model_yml}
 
-    # @pytest.fixture(scope="class")
-    # def project_config_update(self):
-    #     return {
-    #         "dbt-cloud": {
-    #             "account_id": "123",
-    #             "application": "test",
-    #             "environment": "test",
-    #             "api_key": "test",
-    #         }
-    #     }
-
     def test_dbt_cloud(self, project):
         run_dbt(["parse"], expect_pass=True)
         conf = yaml.safe_load(
@@ -113,13 +102,13 @@ class TestProjectDbtCloudConfigString:
     def models(self):
         return {"simple_model.sql": simple_model_sql, "simple_model.yml": simple_model_yml}
 
-    @pytest.fixture(scope="class")
-    def project_config_update(self):
-        return {"dbt-cloud": "Some string"}
-
-    def test_dbt_cloud(self, project):
+    def test_dbt_cloud_invalid(self, project):
+        run_dbt()
+        config = {"name": "test", "profile": "test", "dbt-cloud": "Some string"}
+        update_config_file(config, "dbt_project.yml")
         expected_err = (
             "at path ['dbt-cloud']: 'Some string' is not valid under any of the given schemas"
         )
-        with pytest.raises(ProjectContractError, match=expected_err):
+        with pytest.raises(ProjectContractError) as excinfo:
             run_dbt()
+        assert expected_err in str(excinfo.value)
