@@ -225,6 +225,7 @@ class Project(dbtClassMixin, Replaceable):
     packages: List[PackageSpec] = field(default_factory=list)
     query_comment: Optional[Union[QueryComment, NoValue, str]] = field(default_factory=NoValue)
     restrict_access: bool = False
+    dbt_cloud: Dict[str, Any] = field(default_factory=dict)
 
     class Config(dbtMashConfig):
         # These tell mashumaro to use aliases for jsonschema and for "from_dict"
@@ -251,6 +252,7 @@ class Project(dbtClassMixin, Replaceable):
             "query_comment": "query-comment",
             "restrict_access": "restrict-access",
             "semantic_models": "semantic-models",
+            "dbt_cloud": "dbt-cloud",
         }
 
     @classmethod
