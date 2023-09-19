@@ -3,4 +3,4 @@ body: Add column quotes in macro to avoid build failure
 time: 2023-09-18T14:51:27.988997-06:00
 custom:
   Author: seanglynn-thrive
-  Issue: "8529"
+  Issue: "6154"
